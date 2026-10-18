@@ -1,0 +1,247 @@
+// Prisma Schema for Library Seat Booking Platform
+// Compatible with both PostgreSQL and SQLite
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(uuid())
+  name         String
+  email        String     @unique
+  password     String
+  phone        String?
+  role         String     @default("USER") // "USER" | "OWNER" | "ADMIN"
+  isApproved   Boolean    @default(true)   // False for new Library Owners until Admin approves
+  approvalStatus String   @default("APPROVED") // "APPROVED" | "PENDING" | "REJECTED"
+  otp          String?    // Temporary 6-digit OTP for email login
+  otpExpiresAt DateTime?  // OTP validity window (10 mins)
+  resetToken   String?    // Password reset code
+  resetTokenExpiresAt DateTime?
+  avatar       String?
+  activeToken  String?    // Stores current active JWT session token to enforce single device login
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  ownedLibraries Library[]
+  bookings       Booking[]
+  seatLocks      SeatLock[]
+  reviews        Review[]
+  attendances    Attendance[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model EmailVerification {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  otp       String
+  verified  Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model Library {
+  id              String      @id @default(uuid())
+  name            String
+  slug            String      @unique
+  tagline         String?
+  description     String
+  address         String
+  city            String
+  district        String?
+  state           String
+  pincode         String
+  latitude        Float
+  longitude       Float
+  photos          String      // JSON string array of photo URLs
+  facilities      String      // JSON string array of facilities e.g. ["AC", "High-speed WiFi", "Power Sockets"]
+  hourlyRate      Float
+  dailyRate       Float?
+  monthlyRate     Float?
+  yearlyRate      Float?
+  enableMembership Boolean    @default(true)
+  enableMonthly    Boolean    @default(true)
+  monthlyDetails   String?
+  enableYearly     Boolean    @default(true)
+  yearlyDetails    String?
+  taxPercent       Float      @default(0)
+  serviceFee       Float      @default(0)
+  extraChargesDesc String?    @default("Service & Maintenance Fee")
+  hourlySeats      Int        @default(10)
+  monthlySeats     Int        @default(5)
+  yearlySeats      Int        @default(5)
+  openingTime     String      // e.g. "07:00"
+  closingTime     String      // e.g. "23:00"
+  status          String      @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  rejectionReason String?
+  totalSeats      Int         @default(0)
+  ownerId         String
+  owner           User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  seatZones       SeatZone[]
+  seats           Seat[]
+  bookings        Booking[]
+  reviews         Review[]
+  attendances     Attendance[]
+
+  @@index([city])
+  @@index([status])
+  @@index([ownerId])
+}
+
+model SeatZone {
+  id          String   @id @default(uuid())
+  name        String   // e.g. "Silent Zone", "AC Deluxe Hall", "Discussion Bay"
+  description String?
+  libraryId   String
+  library     Library  @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+
+  seats       Seat[]
+
+  @@index([libraryId])
+}
+
+model Seat {
+  id             String     @id @default(uuid())
+  seatNumber     String     // e.g. "S-01", "A-12"
+  seatType       String     @default("STANDARD") // "STANDARD" | "PREMIUM_ERGONOMIC" | "PRIVATE_CUBICLE"
+  category       String     @default("HOURLY")   // "HOURLY" | "MONTHLY" | "YEARLY"
+  hourlyPrice    Float      // Allows custom seat-specific price or matches library rate
+  hasPowerSocket Boolean    @default(true)
+  hasLamp        Boolean    @default(true)
+  isAvailable    Boolean    @default(true) // Maintenance toggle
+  libraryId      String
+  library        Library    @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  seatZoneId     String
+  seatZone       SeatZone   @relation(fields: [seatZoneId], references: [id], onDelete: Cascade)
+
+  bookings       Booking[]
+  seatLocks      SeatLock[]
+
+  @@index([libraryId])
+  @@index([seatZoneId])
+}
+
+model SeatLock {
+  id            String    @id @default(uuid())
+  lockToken     String    @unique
+  seatId        String
+  seat          Seat      @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date          String    // YYYY-MM-DD
+  startTime     String    // HH:MM (e.g. "10:00")
+  endTime       String    // HH:MM (e.g. "13:00")
+  startDateTime DateTime
+  endDateTime   DateTime
+  expiresAt     DateTime  // Exactly 5 minutes from lockedAt
+  status        String    @default("ACTIVE") // "ACTIVE" | "RELEASED" | "EXPIRED" | "CONVERTED"
+  createdAt     DateTime  @default(now())
+
+  @@index([seatId, startDateTime, endDateTime])
+  @@index([expiresAt])
+  @@index([status])
+}
+
+model Booking {
+  id            String    @id @default(uuid())
+  bookingCode   String    @unique // e.g. "LIB-2026-X89"
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  libraryId     String
+  library       Library   @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  seatId        String
+  seat          Seat      @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  date          String    // YYYY-MM-DD
+  startTime     String    // HH:MM
+  endTime       String    // HH:MM
+  startDateTime DateTime
+  endDateTime   DateTime
+  durationHours Float
+  hourlyRate    Float
+  seatAmount    Float
+  taxAmount     Float
+  platformFee   Float
+  totalAmount   Float
+  status        String    @default("CONFIRMED") // "CONFIRMED" | "CHECKED_IN" | "COMPLETED" | "CANCELLED"
+  bookingType   String    @default("HOURLY") // "HOURLY" | "DAILY" | "MONTHLY" | "YEARLY"
+  validUntil    DateTime? // Validity expiry date for Monthly & Yearly passes
+  qrCode             String?   // QR Code Data URL or payload
+  checkInTime        DateTime?
+  reminder30Sent     Boolean   @default(false)
+  reminder90Sent     Boolean   @default(false)
+  refundAmount       Float?    @default(0)
+  refundStatus       String?   // "NONE" | "PROCESSED_30_NOSHOW" | "PROCESSED_50_CANCEL"
+  cancellationReason String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  payment       Payment?
+  attendances   Attendance[]
+
+  @@index([userId])
+  @@index([libraryId])
+  @@index([seatId, startDateTime, endDateTime])
+  @@index([status])
+}
+
+model Payment {
+  id                 String   @id @default(uuid())
+  bookingId          String   @unique
+  booking            Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount             Float
+  currency           String   @default("INR")
+  paymentMethod      String   @default("UPI") // "UPI" | "CARD" | "NET_BANKING"
+  transactionId      String   @unique
+  platformCommission Float
+  ownerEarnings      Float
+  paymentStatus      String   @default("PAID") // "PAID" | "REFUNDED" | "FAILED"
+  createdAt          DateTime @default(now())
+
+  @@index([transactionId])
+  @@index([paymentStatus])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int      // 1 to 5
+  comment   String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  libraryId String
+  library   Library  @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([libraryId])
+}
+
+model Attendance {
+  id          String   @id @default(uuid())
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  libraryId   String
+  library     Library  @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  date        String   // "YYYY-MM-DD" local/IST date
+  checkInTime DateTime @default(now())
+  passType    String   @default("MONTHLY") // "MONTHLY" | "YEARLY" | "HOURLY" | "DAILY"
+  seatNumber  String?
+  createdAt   DateTime @default(now())
+
+  @@unique([bookingId, date]) // Security constraint: Exactly 1 attendance scan allowed per pass per day
+  @@index([userId])
+  @@index([libraryId])
+  @@index([date])
+}
