@@ -135,6 +135,13 @@ export class EmailService {
 
       if (!result.ok) {
         console.warn('⚠️ Brevo API Error:', result.data);
+        console.log(`\n======================================================`);
+        console.log(`🔑 [CONSOLE OTP FALLBACK]`);
+        console.log(`👤 Target: ${toEmail} (${toName || 'User'})`);
+        console.log(`🎯 Purpose: ${purpose}`);
+        console.log(`🔐 Active Code: ${otp}`);
+        console.log(`⚠️ Brevo status: ${result.data?.message || 'Dispatch failed'}`);
+        console.log(`======================================================\n`);
         const errorMsg = result.data?.message || 'Brevo transactional email dispatch failed.';
         return {
           success: false,
@@ -146,6 +153,11 @@ export class EmailService {
       return { success: true, messageId: result.data.messageId };
     } catch (err: any) {
       console.error('❌ Failed to call Brevo API:', err.message);
+      console.log(`\n======================================================`);
+      console.log(`🔑 [CONSOLE OTP FALLBACK] (Network Exception)`);
+      console.log(`👤 Target: ${toEmail}`);
+      console.log(`🔐 Active Code: ${otp}`);
+      console.log(`======================================================\n`);
       return { success: false, error: err.message };
     }
   }

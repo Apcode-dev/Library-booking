@@ -65,7 +65,7 @@ export class AuthController {
         const errorText = emailResult.error || '';
         if (errorText.includes('unrecognised IP address') || errorText.includes('authorised_ips')) {
           const ipMatch = errorText.match(/(?:IP address\s+)([0-9a-fA-F:.]+)/);
-          const detectedIp = ipMatch ? ipMatch[1] : 'your IP';
+          const detectedIp = (ipMatch ? ipMatch[1] : 'your IP').replace(/\.+$/, '');
           res.status(403).json({
             success: false,
             brevoIpError: true,
@@ -78,14 +78,13 @@ export class AuthController {
 
         res.status(500).json({
           success: false,
-          message: errorText || 'Failed to dispatch verification email via Brevo.',
+          message: errorText || 'Failed to dispatch verification email.',
         });
         return;
       }
 
       res.json({
         success: true,
-        otp,
         message: `A 6-digit verification code has been sent to ${normalizedEmail}. Please check your inbox.`,
       });
     } catch (error: any) {
@@ -395,16 +394,29 @@ export class AuthController {
       });
 
       if (!emailResult.success) {
+        const errorText = emailResult.error || '';
+        if (errorText.includes('unrecognised IP address') || errorText.includes('authorised_ips')) {
+          const ipMatch = errorText.match(/(?:IP address\s+)([0-9a-fA-F:.]+)/);
+          const detectedIp = (ipMatch ? ipMatch[1] : 'your IP').replace(/\.+$/, '');
+          res.status(403).json({
+            success: false,
+            brevoIpError: true,
+            detectedIp,
+            message: `Brevo Security Alert: IP address (${detectedIp}) is not authorised in your Brevo account. Please add it in https://app.brevo.com/security/authorised_ips or disable Authorised IPs in Brevo security settings.`,
+            error: errorText,
+          });
+          return;
+        }
+
         res.status(500).json({
           success: false,
-          message: emailResult.error || 'Failed to send password reset code via Brevo.',
+          message: errorText || 'Failed to send password reset code.',
         });
         return;
       }
 
       res.json({
         success: true,
-        otp: resetOtp,
         message: `A password reset code has been sent to ${user.email}. Please check your inbox.`,
       });
     } catch (error: any) {
