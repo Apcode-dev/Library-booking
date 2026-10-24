@@ -19,7 +19,6 @@ import {
   Sparkles,
   ArrowRight,
   Lock,
-  Zap,
 } from 'lucide-react';
 
 interface BookingCheckoutModalProps {
@@ -152,37 +151,6 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
     }
   };
 
-  // 2. Fast Instant Simulation (Demo Fallback)
-  const handleSimulatePayment = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await api.post('/bookings/confirm', {
-        lockToken: lockData.lockToken,
-        paymentMethod: 'SIMULATED_TEST',
-        bookingType: lockData.bookingType || 'HOURLY',
-      });
-
-      if (res.data.success) {
-        setConfirmedBooking(res.data.booking);
-        toast.success('Test Booking confirmed successfully!');
-        try {
-          confetti({
-            particleCount: 100,
-            spread: 70,
-            origin: { y: 0.6 },
-          });
-        } catch (_) {}
-      }
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message || 'Payment simulation failed. Your lock may have expired.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-fadeIn">
@@ -319,8 +287,9 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
                       Razorpay Payment Gateway
                     </span>
                   </div>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full border border-blue-300 font-mono">
-                    rzp_test_...2qfrt7
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    256-Bit SSL Encrypted
                   </span>
                 </div>
 
@@ -411,19 +380,6 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
                   </>
                 )}
               </button>
-
-              {/* Instant Test Mode Fallback Button */}
-              <div className="pt-1 text-center">
-                <button
-                  type="button"
-                  onClick={handleSimulatePayment}
-                  disabled={loading}
-                  className="text-[11px] text-slate-500 hover:text-slate-800 font-semibold underline transition inline-flex items-center gap-1"
-                >
-                  <Zap className="w-3 h-3 text-amber-500" />
-                  Or Instant Demo Confirm (Quick Test without Gateway)
-                </button>
-              </div>
             </div>
           </div>
         )}

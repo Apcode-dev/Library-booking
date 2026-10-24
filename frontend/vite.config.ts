@@ -9,11 +9,6 @@ export default defineConfig({
     port: 5173,
     allowedHosts: [
       '.trycloudflare.com',
-      'multimedia-blackberry-traditional-kenneth.trycloudflare.com',
-      'camel-cam-gathering-mother.trycloudflare.com',
-      'billion-electron-humor-coverage.trycloudflare.com',
-      'cuts-midwest-specifically-female.trycloudflare.com',
-      'wisdom-adjusted-nevertheless-tail.trycloudflare.com',
       'localhost',
       '127.0.0.1',
     ],

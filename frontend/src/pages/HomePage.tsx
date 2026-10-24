@@ -669,7 +669,7 @@ export const HomePage: React.FC = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400">
-                    Interactive Live Feature Simulation
+                    Live Desk Booking Preview
                   </span>
                   <h3 className="text-lg font-bold text-white mt-0.5 flex items-center gap-2">
                     <Armchair className="w-5 h-5 text-blue-400" />
