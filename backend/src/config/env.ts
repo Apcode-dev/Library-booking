@@ -13,6 +13,6 @@ export const ENV = {
   SEAT_LOCK_DURATION_MINUTES: 5, // 5-minute temporary hold
   BREVO_API_KEY: process.env.BREVO_API_KEY || '',
   BREVO_SENDER_EMAIL: process.env.BREVO_SENDER_EMAIL || 'ap.code.in@gmail.com',
-  BREVO_SENDER_NAME: process.env.BREVO_SENDER_NAME || 'LibSpace Platform',
+  BREVO_SENDER_NAME: process.env.BREVO_SENDER_NAME || 'LibSpace',
   RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || 'rzp_test_THFHFpRR2qfrt7',
 };
