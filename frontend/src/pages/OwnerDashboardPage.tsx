@@ -31,12 +31,23 @@ import {
   CalendarDays,
   FileText,
   Edit3,
+  Loader2,
 } from 'lucide-react';
 
 import AuthModal from '../components/common/AuthModal';
 import ProfileModal from '../components/common/ProfileModal';
 import QRScannerModal from '../components/scanner/QRScannerModal';
 import { STANDARD_AMENITIES } from '../constants/amenities';
+
+// Supported Regions for LibSpace Library Listings
+const SUPPORTED_REGIONS = [
+  'Uttar Pradesh',
+  'Rajasthan',
+  'Delhi',
+  'Bihar',
+  'Maharashtra',
+  'Haryana',
+];
 
 export const OwnerDashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -51,10 +62,13 @@ export const OwnerDashboardPage: React.FC = () => {
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [address, setAddress] = useState('');
-  const [city, setCity] = useState('New Delhi');
+  const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
-  const [state, setState] = useState('Delhi');
+  const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+  const [pincodeError, setPincodeError] = useState<string | null>(null);
+  const [availableLocalities, setAvailableLocalities] = useState<string[]>([]);
   const [hourlyRate, setHourlyRate] = useState('40');
 
   // Category-wise Seat Allocation
@@ -233,8 +247,110 @@ export const OwnerDashboardPage: React.FC = () => {
     }
   };
 
+  // Automatic Indian PIN Code Lookup with 6-State Service Area Validation
+  const lookupPincode = async (pin: string) => {
+    if (pin.length !== 6) return;
+    setPincodeLoading(true);
+    setPincodeError(null);
+    setAvailableLocalities([]);
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const response = await fetch(`https://api.postalpincode.in/pincode/${pin}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error('Network error looking up PIN code');
+      }
+
+      const data = await response.json();
+      if (
+        !Array.isArray(data) ||
+        !data[0] ||
+        data[0].Status !== 'Success' ||
+        !data[0].PostOffice ||
+        data[0].PostOffice.length === 0
+      ) {
+        setPincodeError('Invalid PIN code. No location records found in postal database.');
+        return;
+      }
+
+      const postOffices = data[0].PostOffice;
+      const firstPo = postOffices[0];
+
+      // Validate detected state against platform's active service regions
+      const detectedState = firstPo.State || '';
+      const isStateSupported = SUPPORTED_REGIONS.some(
+        (s) => s.toLowerCase() === detectedState.trim().toLowerCase()
+      );
+
+      if (!isStateSupported) {
+        setPincodeError(
+          `Service Area Notice: LibSpace currently operates in Uttar Pradesh, Rajasthan, Delhi, Bihar, Maharashtra, and Haryana. PIN code ${pin} (${detectedState}) is outside our active service regions.`
+        );
+        setState(detectedState);
+        setDistrict(firstPo.District || '');
+        setCity(firstPo.District || firstPo.Name || '');
+        return;
+      }
+
+      // Collect all unique post office localities under this PIN code
+      const localities = Array.from(
+        new Set(postOffices.map((po: any) => po.Name).filter(Boolean))
+      ) as string[];
+
+      setAvailableLocalities(localities);
+
+      // Auto-fill existing form fields
+      setState(detectedState);
+      setDistrict(firstPo.District || '');
+      const primaryCity = firstPo.District || firstPo.Name || '';
+      setCity(primaryCity);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        setPincodeError('PIN code lookup timed out. Please enter details manually.');
+      } else {
+        setPincodeError('Unable to fetch PIN code details. Please verify or fill manually.');
+      }
+    } finally {
+      setPincodeLoading(false);
+    }
+  };
+
+  const handlePincodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const digits = raw.replace(/\D/g, '').slice(0, 6);
+    setPincode(digits);
+
+    // Clear stale location values when PIN code changes
+    if (digits.length < 6) {
+      setPincodeError(null);
+      setAvailableLocalities([]);
+      if (pincode.length === 6 && digits.length < 6) {
+        setCity('');
+        setDistrict('');
+        setState('');
+      }
+    } else if (digits.length === 6) {
+      lookupPincode(digits);
+    }
+  };
+
   const handleCreateLibrary = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate supported service region
+    if (state && !SUPPORTED_REGIONS.some((s) => s.toLowerCase() === state.trim().toLowerCase())) {
+      alert(
+        `Currently, LibSpace listings are only available in Uttar Pradesh, Rajasthan, Delhi, Bihar, Maharashtra, and Haryana. (${state} is not supported)`
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       const parsedHourlySeats = Number(hourlySeats) || 10;
@@ -277,10 +393,12 @@ export const OwnerDashboardPage: React.FC = () => {
         setName('');
         setTagline('');
         setAddress('');
-        setCity('New Delhi');
+        setCity('');
         setDistrict('');
-        setState('Delhi');
+        setState('');
         setPincode('');
+        setPincodeError(null);
+        setAvailableLocalities([]);
         setHourlyRate('40');
         setHourlySeats('10');
         setMonthlySeats('5');
@@ -1599,6 +1717,25 @@ export const OwnerDashboardPage: React.FC = () => {
                     placeholder="e.g. New Delhi"
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
+                  {availableLocalities.length > 1 && (
+                    <div className="mt-1.5">
+                      <label className="block text-[10px] font-medium text-slate-500 mb-0.5">
+                        Select locality ({availableLocalities.length} found):
+                      </label>
+                      <select
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="w-full px-2 py-1 text-[11px] border border-blue-200 bg-blue-50/60 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      >
+                        {district && <option value={district}>{district} (General)</option>}
+                        {availableLocalities.map((loc) => (
+                          <option key={loc} value={loc}>
+                            {loc}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1632,19 +1769,45 @@ export const OwnerDashboardPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Pincode *
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Pincode *</span>
+                    {pincodeLoading && (
+                      <span className="text-[10px] font-normal text-blue-600 flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Fetching...
+                      </span>
+                    )}
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value)}
-                    placeholder="e.g. 110092"
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      maxLength={6}
+                      value={pincode}
+                      onChange={handlePincodeChange}
+                      placeholder="e.g. 110092"
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    {pincodeLoading && (
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {pincodeError && (
+                <div
+                  className={`p-2.5 rounded-xl text-xs flex items-start gap-2 border ${
+                    pincodeError.includes('Service Area Notice')
+                      ? 'bg-amber-50 border-amber-200 text-amber-800'
+                      : 'bg-red-50 border-red-200 text-red-700'
+                  }`}
+                >
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{pincodeError}</span>
+                </div>
+              )}
 
               {/* Hourly Pricing & Category Seats */}
               <div>
