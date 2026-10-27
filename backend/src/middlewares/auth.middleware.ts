@@ -11,6 +11,8 @@ declare global {
         email: string;
         role: 'USER' | 'OWNER' | 'ADMIN';
         name: string;
+        adminType?: string | null;
+        assignedState?: string | null;
       };
     }
   }
@@ -40,7 +42,7 @@ export const authenticateUser = async (
 
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, email: true, role: true, name: true, activeToken: true },
+      select: { id: true, email: true, role: true, name: true, activeToken: true, adminType: true, assignedState: true },
     });
 
     if (!user) {
@@ -66,6 +68,8 @@ export const authenticateUser = async (
       email: string;
       role: 'USER' | 'OWNER' | 'ADMIN';
       name: string;
+      adminType?: string | null;
+      assignedState?: string | null;
     };
 
     next();

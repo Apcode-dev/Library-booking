@@ -1,31 +1,164 @@
 import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import prisma from '../config/prisma';
 
 export class AdminController {
   /**
    * Admin Platform Overview Metrics & Financial Dashboard
+   * Scoped to State if logged in as SUB_ADMIN; Pan-India if MASTER_ADMIN.
    */
-  static async getPlatformStats(_req: Request, res: Response): Promise<void> {
+  static async getPlatformStats(req: Request, res: Response): Promise<void> {
     try {
+      const isSubAdmin = req.user?.adminType === 'SUB_ADMIN';
+      const assignedState = req.user?.assignedState || null;
+
+      // ==========================================
+      // 1. SUB-ADMIN VIEW (State Scoped)
+      // ==========================================
+      if (isSubAdmin && assignedState) {
+        const [
+          totalLibrariesInState,
+          approvedLibrariesInState,
+          pendingLibrariesInState,
+          forwardedLibrariesInState,
+          rejectedLibrariesInState,
+          stateLibraries,
+          stateBookingsCount,
+          statePayments,
+          recentStateBookings,
+        ] = await Promise.all([
+          prisma.library.count({ where: { state: assignedState } }),
+          prisma.library.count({ where: { state: assignedState, status: 'APPROVED' } }),
+          prisma.library.count({ where: { state: assignedState, status: 'PENDING' } }),
+          prisma.library.count({ where: { state: assignedState, status: 'FORWARDED_TO_MASTER' } }),
+          prisma.library.count({ where: { state: assignedState, status: 'REJECTED' } }),
+          prisma.library.findMany({
+            where: { state: assignedState },
+            select: {
+              id: true,
+              lid: true,
+              name: true,
+              city: true,
+              state: true,
+              address: true,
+              status: true,
+              hourlyRate: true,
+              _count: { select: { seats: true, bookings: true } },
+              bookings: {
+                where: { payment: { paymentStatus: 'PAID' } },
+                select: {
+                  payment: {
+                    select: { amount: true, platformCommission: true },
+                  },
+                },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          }),
+          prisma.booking.count({
+            where: { library: { state: assignedState } },
+          }),
+          prisma.payment.findMany({
+            where: {
+              paymentStatus: 'PAID',
+              booking: { library: { state: assignedState } },
+            },
+          }),
+          prisma.booking.findMany({
+            where: { library: { state: assignedState } },
+            take: 8,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              user: { select: { name: true, email: true } },
+              library: { select: { name: true, city: true } },
+              payment: true,
+            },
+          }),
+        ]);
+
+        const stateGMV = statePayments.reduce((acc, p) => acc + p.amount, 0);
+        const stateCommission = statePayments.reduce((acc, p) => acc + p.platformCommission, 0);
+        const totalStateDesks = stateLibraries.reduce((acc, l) => acc + (l._count?.seats || 0), 0);
+
+        // Calculate Per-Library Revenue & Performance Breakdown
+        const perLibraryStats = stateLibraries.map((lib) => {
+          const libraryRevenue = lib.bookings.reduce(
+            (acc, b) => acc + (b.payment?.amount || 0),
+            0
+          );
+          const libraryCommission = lib.bookings.reduce(
+            (acc, b) => acc + (b.payment?.platformCommission || 0),
+            0
+          );
+          return {
+            id: lib.id,
+            lid: lib.lid,
+            name: lib.name,
+            city: lib.city,
+            state: lib.state,
+            address: lib.address,
+            status: lib.status,
+            hourlyRate: lib.hourlyRate,
+            totalDesks: lib._count.seats,
+            totalBookings: lib._count.bookings,
+            totalRevenue: parseFloat(libraryRevenue.toFixed(2)),
+            platformCommission: parseFloat(libraryCommission.toFixed(2)),
+          };
+        });
+
+        res.json({
+          success: true,
+          isSubAdmin: true,
+          assignedState,
+          stats: {
+            assignedState,
+            totalLibraries: totalLibrariesInState,
+            totalApprovedLibraries: approvedLibrariesInState,
+            pendingApprovals: pendingLibrariesInState,
+            forwardedApprovals: forwardedLibrariesInState,
+            rejectedLibraries: rejectedLibrariesInState,
+            totalBookings: stateBookingsCount,
+            totalDesks: totalStateDesks,
+            totalGMV: parseFloat(stateGMV.toFixed(2)),
+            platformCommissionEarned: parseFloat(stateCommission.toFixed(2)),
+          },
+          perLibraryStats,
+          recentBookings: recentStateBookings,
+        });
+        return;
+      }
+
+      // ==========================================
+      // 2. MASTER ADMIN VIEW (Pan-India)
+      // ==========================================
       const [
         totalUsers,
         totalLibraries,
         pendingLibraries,
+        forwardedToMasterCount,
         totalBookings,
         payments,
+        subAdminsCount,
+        allSubAdmins,
         recentBookings,
       ] = await Promise.all([
         prisma.user.count(),
         prisma.library.count({ where: { status: 'APPROVED' } }),
         prisma.library.count({ where: { status: 'PENDING' } }),
+        prisma.library.count({ where: { status: 'FORWARDED_TO_MASTER' } }),
         prisma.booking.count(),
         prisma.payment.findMany({ where: { paymentStatus: 'PAID' } }),
+        prisma.user.count({ where: { role: 'ADMIN', adminType: 'SUB_ADMIN' } }),
+        prisma.user.findMany({
+          where: { role: 'ADMIN', adminType: 'SUB_ADMIN' },
+          select: { id: true, name: true, email: true, assignedState: true },
+        }),
         prisma.booking.findMany({
           take: 8,
           orderBy: { createdAt: 'desc' },
           include: {
             user: { select: { name: true, email: true } },
-            library: { select: { name: true } },
+            library: { select: { name: true, city: true, state: true } },
             payment: true,
           },
         }),
@@ -34,16 +167,50 @@ export class AdminController {
       const totalGMV = payments.reduce((acc, p) => acc + p.amount, 0);
       const totalCommission = payments.reduce((acc, p) => acc + p.platformCommission, 0);
 
+      // State Distribution Breakdown
+      const supportedStates = [
+        'Uttar Pradesh',
+        'Rajasthan',
+        'Delhi',
+        'Bihar',
+        'Maharashtra',
+        'Haryana',
+      ];
+
+      const stateDistribution = await Promise.all(
+        supportedStates.map(async (state) => {
+          const [libCount, pendingCount, forwardedCount] = await Promise.all([
+            prisma.library.count({ where: { state, status: 'APPROVED' } }),
+            prisma.library.count({ where: { state, status: 'PENDING' } }),
+            prisma.library.count({ where: { state, status: 'FORWARDED_TO_MASTER' } }),
+          ]);
+          const assignedAdmin = allSubAdmins.find((a) => a.assignedState === state);
+          return {
+            state,
+            approvedLibraries: libCount,
+            pendingApprovals: pendingCount,
+            forwardedApprovals: forwardedCount,
+            assignedAdmin: assignedAdmin
+              ? { id: assignedAdmin.id, name: assignedAdmin.name, email: assignedAdmin.email }
+              : null,
+          };
+        })
+      );
+
       res.json({
         success: true,
+        isSubAdmin: false,
         stats: {
           totalUsers,
           totalApprovedLibraries: totalLibraries,
           pendingApprovals: pendingLibraries,
+          forwardedToMasterCount,
+          subAdminsCount,
           totalBookings,
           totalGMV: parseFloat(totalGMV.toFixed(2)),
           platformCommissionEarned: parseFloat(totalCommission.toFixed(2)),
         },
+        stateDistribution,
         recentBookings,
       });
     } catch (error: any) {
@@ -52,13 +219,25 @@ export class AdminController {
   }
 
   /**
-   * Get all libraries for admin moderation (with status filter)
+   * Get all libraries for admin moderation.
+   * If SUB_ADMIN: strictly filtered to their assignedState.
+   * Computes per-library revenue and total bookings.
    */
   static async getAllLibraries(req: Request, res: Response): Promise<void> {
     try {
-      const { status } = req.query;
+      const { status, state: requestedState } = req.query;
+      const isSubAdmin = req.user?.adminType === 'SUB_ADMIN';
+      const assignedState = req.user?.assignedState;
 
       const whereClause: any = {};
+
+      // If Sub-Admin, enforce state filter strictly
+      if (isSubAdmin && assignedState) {
+        whereClause.state = assignedState;
+      } else if (requestedState && typeof requestedState === 'string' && requestedState !== 'ALL') {
+        whereClause.state = requestedState;
+      }
+
       if (status && typeof status === 'string' && status !== 'ALL') {
         whereClause.status = status;
       }
@@ -68,15 +247,38 @@ export class AdminController {
         include: {
           owner: { select: { name: true, email: true, phone: true } },
           _count: { select: { seats: true, bookings: true } },
+          bookings: {
+            where: { payment: { paymentStatus: 'PAID' } },
+            select: {
+              payment: {
+                select: { amount: true, platformCommission: true },
+              },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
 
-      const formatted = libraries.map((lib) => ({
-        ...lib,
-        photos: JSON.parse(lib.photos || '[]'),
-        facilities: JSON.parse(lib.facilities || '[]'),
-      }));
+      const formatted = libraries.map((lib) => {
+        const totalRevenue = lib.bookings.reduce(
+          (acc, b) => acc + (b.payment?.amount || 0),
+          0
+        );
+        const totalCommission = lib.bookings.reduce(
+          (acc, b) => acc + (b.payment?.platformCommission || 0),
+          0
+        );
+
+        return {
+          ...lib,
+          bookings: undefined, // remove raw bookings array to keep payload compact
+          totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+          platformCommission: parseFloat(totalCommission.toFixed(2)),
+          totalBookingsCount: lib._count.bookings,
+          photos: JSON.parse(lib.photos || '[]'),
+          facilities: JSON.parse(lib.facilities || '[]'),
+        };
+      });
 
       res.json({
         success: true,
@@ -89,17 +291,36 @@ export class AdminController {
   }
 
   /**
-   * Approve a pending library
+   * Approve a pending or forwarded library
+   * State Sub-Admin can only approve within their assigned state;
+   * Master Admin can approve any library (including forwarded ones).
    */
   static async approveLibrary(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+      const isSubAdmin = req.user?.adminType === 'SUB_ADMIN';
+      const assignedState = req.user?.assignedState;
+
+      const targetLib = await prisma.library.findUnique({ where: { id } });
+      if (!targetLib) {
+        res.status(404).json({ success: false, message: 'Library not found' });
+        return;
+      }
+
+      if (isSubAdmin && assignedState && targetLib.state !== assignedState) {
+        res.status(403).json({
+          success: false,
+          message: `Access Denied: You are only authorized to moderate libraries in ${assignedState}.`,
+        });
+        return;
+      }
 
       const library = await prisma.library.update({
         where: { id },
         data: {
           status: 'APPROVED',
           rejectionReason: null,
+          forwardedToMaster: false,
         },
       });
 
@@ -115,17 +336,35 @@ export class AdminController {
 
   /**
    * Reject a library submission
+   * State Sub-Admin can only reject within their assigned state; Master Admin can reject any.
    */
   static async rejectLibrary(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
       const { reason } = req.body;
+      const isSubAdmin = req.user?.adminType === 'SUB_ADMIN';
+      const assignedState = req.user?.assignedState;
+
+      const targetLib = await prisma.library.findUnique({ where: { id } });
+      if (!targetLib) {
+        res.status(404).json({ success: false, message: 'Library not found' });
+        return;
+      }
+
+      if (isSubAdmin && assignedState && targetLib.state !== assignedState) {
+        res.status(403).json({
+          success: false,
+          message: `Access Denied: You are only authorized to moderate libraries in ${assignedState}.`,
+        });
+        return;
+      }
 
       const library = await prisma.library.update({
         where: { id },
         data: {
           status: 'REJECTED',
           rejectionReason: reason || 'Incomplete verification documents or photos.',
+          forwardedToMaster: false,
         },
       });
 
@@ -140,15 +379,339 @@ export class AdminController {
   }
 
   /**
+   * Forward a library approval request to Master Admin
+   * Sub-Admin uses this if they identify any problem, anomaly, or need master review.
+   */
+  static async forwardLibraryToMaster(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const isSubAdmin = req.user?.adminType === 'SUB_ADMIN';
+      const assignedState = req.user?.assignedState;
+
+      const targetLib = await prisma.library.findUnique({ where: { id } });
+      if (!targetLib) {
+        res.status(404).json({ success: false, message: 'Library not found' });
+        return;
+      }
+
+      if (isSubAdmin && assignedState && targetLib.state !== assignedState) {
+        res.status(403).json({
+          success: false,
+          message: `Access Denied: You can only forward libraries in your assigned state (${assignedState}).`,
+        });
+        return;
+      }
+
+      const library = await prisma.library.update({
+        where: { id },
+        data: {
+          status: 'FORWARDED_TO_MASTER',
+          forwardedToMaster: true,
+          forwardReason: reason || 'Forwarded to Master Administrator for secondary review.',
+          forwardedAt: new Date(),
+          forwardedByAdminId: req.user?.id || null,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: `Library "${library.name}" has been escalated and forwarded to Master Admin for review.`,
+        library,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to forward library to master', error: error.message });
+    }
+  }
+
+  // =========================================================================
+  // STATE SUB-ADMIN MANAGEMENT (Master Admin Only)
+  // Strict rule: Exactly ONE Sub-Admin per State
+  // =========================================================================
+
+  /**
+   * List all State Sub-Admins
+   */
+  static async getSubAdmins(req: Request, res: Response): Promise<void> {
+    try {
+      if (req.user?.adminType === 'SUB_ADMIN') {
+        res.status(403).json({ success: false, message: 'Access Denied: Only Master Admin can manage Sub-Admins.' });
+        return;
+      }
+
+      const subAdmins = await prisma.user.findMany({
+        where: {
+          role: 'ADMIN',
+          adminType: 'SUB_ADMIN',
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          adminType: true,
+          assignedState: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Enrich with state metrics
+      const enriched = await Promise.all(
+        subAdmins.map(async (sa) => {
+          const state = sa.assignedState;
+          if (!state) {
+            return { ...sa, librariesCount: 0, pendingCount: 0, totalRevenue: 0 };
+          }
+          const [librariesCount, pendingCount, payments] = await Promise.all([
+            prisma.library.count({ where: { state, status: 'APPROVED' } }),
+            prisma.library.count({ where: { state, status: 'PENDING' } }),
+            prisma.payment.findMany({
+              where: {
+                paymentStatus: 'PAID',
+                booking: { library: { state } },
+              },
+              select: { amount: true },
+            }),
+          ]);
+          const totalRevenue = payments.reduce((acc, p) => acc + p.amount, 0);
+          return {
+            ...sa,
+            librariesCount,
+            pendingCount,
+            totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+          };
+        })
+      );
+
+      res.json({
+        success: true,
+        count: enriched.length,
+        subAdmins: enriched,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to fetch sub-admins', error: error.message });
+    }
+  }
+
+  /**
+   * Create a new State Sub-Admin
+   * Strictly enforces: Only ONE Sub-Admin per State
+   */
+  static async createSubAdmin(req: Request, res: Response): Promise<void> {
+    try {
+      if (req.user?.adminType === 'SUB_ADMIN') {
+        res.status(403).json({ success: false, message: 'Access Denied: Only Master Admin can create Sub-Admins.' });
+        return;
+      }
+
+      const { name, email, password, phone, assignedState } = req.body;
+
+      if (!name || !email || !password || !assignedState) {
+        res.status(400).json({
+          success: false,
+          message: 'Name, email, password, and assigned state are required.',
+        });
+        return;
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      const state = assignedState.trim();
+
+      // Check email uniqueness
+      const existingEmail = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+      if (existingEmail) {
+        res.status(400).json({
+          success: false,
+          message: `An account with email ${normalizedEmail} already exists.`,
+        });
+        return;
+      }
+
+      // STRICT RULE: Exactly ONE Sub-Admin per State
+      const existingStateAdmin = await prisma.user.findFirst({
+        where: {
+          role: 'ADMIN',
+          adminType: 'SUB_ADMIN',
+          assignedState: state,
+        },
+      });
+
+      if (existingStateAdmin) {
+        res.status(400).json({
+          success: false,
+          message: `State "${state}" already has an assigned Administrator: ${existingStateAdmin.name} (${existingStateAdmin.email}). Only ONE Sub-Admin is allowed per state.`,
+        });
+        return;
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      const subAdmin = await prisma.user.create({
+        data: {
+          name: name.trim(),
+          email: normalizedEmail,
+          password: passwordHash,
+          phone: phone ? phone.trim() : null,
+          role: 'ADMIN',
+          adminType: 'SUB_ADMIN',
+          assignedState: state,
+          isApproved: true,
+          approvalStatus: 'APPROVED',
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name.trim())}`,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          adminType: true,
+          assignedState: true,
+          createdAt: true,
+        },
+      });
+
+      res.status(201).json({
+        success: true,
+        message: `State Administrator for "${state}" created successfully! Credentials: Email: ${normalizedEmail}`,
+        subAdmin,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to create sub-admin', error: error.message });
+    }
+  }
+
+  /**
+   * Update an existing State Sub-Admin
+   * Master Admin can update name, phone, password, and assigned state (with 1-per-state validation).
+   */
+  static async updateSubAdmin(req: Request, res: Response): Promise<void> {
+    try {
+      if (req.user?.adminType === 'SUB_ADMIN') {
+        res.status(403).json({ success: false, message: 'Access Denied: Only Master Admin can modify Sub-Admins.' });
+        return;
+      }
+
+      const { id } = req.params;
+      const { name, phone, password, assignedState } = req.body;
+
+      const target = await prisma.user.findUnique({ where: { id } });
+      if (!target || target.role !== 'ADMIN') {
+        res.status(404).json({ success: false, message: 'Sub-Admin not found.' });
+        return;
+      }
+
+      // If state is being changed, enforce 1-per-state constraint
+      if (assignedState && assignedState.trim() !== target.assignedState) {
+        const state = assignedState.trim();
+        const existingStateAdmin = await prisma.user.findFirst({
+          where: {
+            role: 'ADMIN',
+            adminType: 'SUB_ADMIN',
+            assignedState: state,
+            NOT: { id },
+          },
+        });
+        if (existingStateAdmin) {
+          res.status(400).json({
+            success: false,
+            message: `State "${state}" is already assigned to ${existingStateAdmin.name} (${existingStateAdmin.email}). Only one Sub-Admin is allowed per state.`,
+          });
+          return;
+        }
+      }
+
+      const updateData: any = {};
+      if (name) updateData.name = name.trim();
+      if (phone !== undefined) updateData.phone = phone ? phone.trim() : null;
+      if (assignedState) updateData.assignedState = assignedState.trim();
+      if (password && password.trim().length >= 6) {
+        updateData.password = await bcrypt.hash(password.trim(), 10);
+      }
+
+      const updated = await prisma.user.update({
+        where: { id },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          adminType: true,
+          assignedState: true,
+          createdAt: true,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: `Sub-Admin "${updated.name}" updated successfully!`,
+        subAdmin: updated,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to update sub-admin', error: error.message });
+    }
+  }
+
+  /**
+   * Delete a State Sub-Admin
+   */
+  static async deleteSubAdmin(req: Request, res: Response): Promise<void> {
+    try {
+      if (req.user?.adminType === 'SUB_ADMIN') {
+        res.status(403).json({ success: false, message: 'Access Denied: Only Master Admin can delete Sub-Admins.' });
+        return;
+      }
+
+      const { id } = req.params;
+
+      const target = await prisma.user.findUnique({ where: { id } });
+      if (!target || target.role !== 'ADMIN') {
+        res.status(404).json({ success: false, message: 'Sub-Admin not found.' });
+        return;
+      }
+
+      if (target.adminType === 'MASTER_ADMIN' || target.email === 'admin@libspace.com') {
+        res.status(403).json({ success: false, message: 'Cannot delete the Master Admin account.' });
+        return;
+      }
+
+      await prisma.user.delete({ where: { id } });
+
+      res.json({
+        success: true,
+        message: `Sub-Admin for ${target.assignedState || target.name} has been removed.`,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to delete sub-admin', error: error.message });
+    }
+  }
+
+  /**
    * Manage users (list all users, count bookings)
    */
   static async getAllUsers(req: Request, res: Response): Promise<void> {
     try {
       const { role } = req.query;
+      const isSubAdmin = req.user?.adminType === 'SUB_ADMIN';
+      const assignedState = req.user?.assignedState;
 
       const whereClause: any = {};
       if (role && typeof role === 'string' && role !== 'ALL') {
         whereClause.role = role;
+      }
+
+      // If Sub-Admin, show users connected to their state (owners with libraries in that state or users who booked in that state)
+      if (isSubAdmin && assignedState) {
+        whereClause.OR = [
+          { ownedLibraries: { some: { state: assignedState } } },
+          { bookings: { some: { library: { state: assignedState } } } },
+        ];
       }
 
       const users = await prisma.user.findMany({

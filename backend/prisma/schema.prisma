@@ -29,6 +29,8 @@ model User {
   securityPin  String?    // Hashed 6-digit PIN for Library Owner card access
   pinResetOtp  String?    // Temporary 6-digit OTP for PIN reset
   pinResetExpiresAt DateTime? // Validity window for PIN reset OTP
+  adminType    String?    @default("MASTER_ADMIN") // "MASTER_ADMIN" | "SUB_ADMIN"
+  assignedState String?   // State managed by Sub-Admin e.g. "Uttar Pradesh"
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -86,9 +88,13 @@ model Library {
   yearlySeats      Int        @default(5)
   openingTime     String      // e.g. "07:00"
   closingTime     String      // e.g. "23:00"
-  status          String      @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
-  rejectionReason String?
-  totalSeats      Int         @default(0)
+  status              String      @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED" | "FORWARDED_TO_MASTER"
+  rejectionReason     String?
+  forwardedToMaster   Boolean     @default(false)
+  forwardReason       String?     // Reason when Sub-Admin forwards library to Master Admin
+  forwardedAt         DateTime?
+  forwardedByAdminId  String?
+  totalSeats          Int         @default(0)
   ownerId         String
   owner           User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt       DateTime    @default(now())
@@ -101,6 +107,7 @@ model Library {
   attendances     Attendance[]
 
   @@index([city])
+  @@index([state])
   @@index([status])
   @@index([ownerId])
 }

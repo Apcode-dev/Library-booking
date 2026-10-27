@@ -7,6 +7,8 @@ export interface User {
   role: UserRole;
   phone?: string;
   avatar?: string;
+  adminType?: 'MASTER_ADMIN' | 'SUB_ADMIN' | string;
+  assignedState?: string | null;
 }
 
 export interface Library {
@@ -53,7 +55,13 @@ export interface Library {
   rating: number;
   reviewCount: number;
   distanceKm?: number | null;
-  status?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'FORWARDED_TO_MASTER' | string;
+  forwardedToMaster?: boolean;
+  forwardReason?: string;
+  forwardedAt?: string;
+  forwardedByAdminId?: string;
+  totalRevenue?: number;
+  totalBookingsCount?: number;
   owner?: { id?: string; name: string; email: string; phone?: string };
   seatZones?: SeatZone[];
   reviews?: Review[];

@@ -23,6 +23,7 @@ async function main() {
       email: 'admin@libspace.com',
       password: adminPasswordHash,
       role: 'ADMIN',
+      adminType: 'MASTER_ADMIN',
       phone: '9999999999',
       isApproved: true,
       approvalStatus: 'APPROVED',

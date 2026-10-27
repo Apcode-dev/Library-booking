@@ -258,6 +258,8 @@ export class AuthController {
           phone: user.phone,
           avatar: user.avatar,
           isApproved: true,
+          adminType: user.adminType || (user.role === 'ADMIN' ? 'MASTER_ADMIN' : null),
+          assignedState: user.assignedState || null,
         },
       });
     } catch (error: any) {
@@ -347,6 +349,8 @@ export class AuthController {
           phone: user.phone,
           avatar: user.avatar,
           isApproved: user.isApproved,
+          adminType: user.adminType || (user.role === 'ADMIN' ? 'MASTER_ADMIN' : null),
+          assignedState: user.assignedState || null,
         },
       });
     } catch (error: any) {
@@ -502,6 +506,8 @@ export class AuthController {
           avatar: true,
           isApproved: true,
           approvalStatus: true,
+          adminType: true,
+          assignedState: true,
           createdAt: true,
           _count: {
             select: {
@@ -546,6 +552,8 @@ export class AuthController {
           avatar: true,
           isApproved: true,
           approvalStatus: true,
+          adminType: true,
+          assignedState: true,
           createdAt: true,
         },
       });
