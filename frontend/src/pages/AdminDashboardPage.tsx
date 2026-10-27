@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Library, User } from '../types';
@@ -23,6 +23,15 @@ import {
   BadgeAlert,
   Search,
   ExternalLink,
+  Filter,
+  Calendar,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Phone,
+  Mail,
+  UserCheck,
+  UserX,
 } from 'lucide-react';
 
 import AuthModal from '../components/common/AuthModal';
@@ -58,12 +67,54 @@ export const AdminDashboardPage: React.FC = () => {
   const [stats, setStats] = useState<any>(null);
   const [pendingLibraries, setPendingLibraries] = useState<Library[]>([]);
   const [forwardedLibraries, setForwardedLibraries] = useState<Library[]>([]);
-  const [pendingOwners, setPendingOwners] = useState<any[]>([]);
   const [allLibraries, setAllLibraries] = useState<Library[]>([]);
-  const [usersList, setUsersList] = useState<User[]>([]);
   const [subAdmins, setSubAdmins] = useState<SubAdminRecord[]>([]);
   const [perLibraryStats, setPerLibraryStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // ========================================================
+  // USER MANAGEMENT STATE
+  // ========================================================
+  const [usersList, setUsersList] = useState<User[]>([]);
+  const [usersPagination, setUsersPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalCount: 0,
+    limit: 10,
+  });
+  const [userSearch, setUserSearch] = useState('');
+  const [userActivityFilter, setUserActivityFilter] = useState<'ALL' | 'WITH_BOOKINGS' | 'NO_BOOKINGS'>('ALL');
+  const [userStatusFilter, setUserStatusFilter] = useState('ALL');
+  const [userPage, setUserPage] = useState(1);
+  const [userLimit, setUserLimit] = useState(10);
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  // User Booking History Modal
+  const [selectedUserForBookings, setSelectedUserForBookings] = useState<User | null>(null);
+  const [userBookingsModalOpen, setUserBookingsModalOpen] = useState(false);
+  const [userBookings, setUserBookings] = useState<any[]>([]);
+  const [userBookingsLoading, setUserBookingsLoading] = useState(false);
+
+  // ========================================================
+  // OWNER MANAGEMENT STATE
+  // ========================================================
+  const [ownersList, setOwnersList] = useState<User[]>([]);
+  const [ownersPagination, setOwnersPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalCount: 0,
+    limit: 10,
+  });
+  const [ownerSearch, setOwnerSearch] = useState('');
+  const [ownerStatusFilter, setOwnerStatusFilter] = useState('ALL');
+  const [ownerLibrariesFilter, setOwnerLibrariesFilter] = useState<'ALL' | 'YES' | 'NO'>('ALL');
+  const [ownerPage, setOwnerPage] = useState(1);
+  const [ownerLimit, setOwnerLimit] = useState(10);
+  const [ownersLoading, setOwnersLoading] = useState(false);
+
+  // Owner's Libraries Modal
+  const [selectedOwnerForLibraries, setSelectedOwnerForLibraries] = useState<User | null>(null);
+  const [ownerLibrariesModalOpen, setOwnerLibrariesModalOpen] = useState(false);
 
   // State Sub-Admin vs Master Admin detection
   const isSubAdmin = user?.adminType === 'SUB_ADMIN';
@@ -72,7 +123,7 @@ export const AdminDashboardPage: React.FC = () => {
   // Tab State: default to 'queue'
   const [activeTab, setActiveTab] = useState<string>('queue');
 
-  // Search / Filter
+  // Search / Filter for Libraries Directory
   const [searchQuery, setSearchQuery] = useState('');
   const [stateFilter, setStateFilter] = useState('ALL');
 
@@ -92,16 +143,16 @@ export const AdminDashboardPage: React.FC = () => {
   const [createAdminLoading, setCreateAdminLoading] = useState(false);
   const [createAdminError, setCreateAdminError] = useState('');
 
+  // Fetch Core Admin Data
   const fetchAdminData = async () => {
     setLoading(true);
     try {
       if (isSubAdmin) {
         // Sub-Admin API calls (state-scoped by backend)
-        const [statsRes, pendingRes, allLibsRes, usersRes] = await Promise.all([
+        const [statsRes, pendingRes, allLibsRes] = await Promise.all([
           api.get('/admin/stats'),
           api.get('/admin/libraries?status=PENDING'),
           api.get('/admin/libraries?status=ALL'),
-          api.get('/admin/users'),
         ]);
 
         if (statsRes.data.success) {
@@ -112,26 +163,21 @@ export const AdminDashboardPage: React.FC = () => {
         }
         if (pendingRes.data.success) setPendingLibraries(pendingRes.data.libraries);
         if (allLibsRes.data.success) setAllLibraries(allLibsRes.data.libraries);
-        if (usersRes.data.success) setUsersList(usersRes.data.users);
       } else {
         // Master Admin API calls (Pan-India)
-        const [statsRes, pendingRes, forwardedRes, pendingOwnersRes, allLibsRes, usersRes, subAdminsRes] =
+        const [statsRes, pendingRes, forwardedRes, allLibsRes, subAdminsRes] =
           await Promise.all([
             api.get('/admin/stats'),
             api.get('/admin/libraries?status=PENDING'),
             api.get('/admin/libraries?status=FORWARDED_TO_MASTER'),
-            api.get('/admin/owners/pending'),
             api.get('/admin/libraries?status=ALL'),
-            api.get('/admin/users'),
             api.get('/admin/sub-admins'),
           ]);
 
         if (statsRes.data.success) setStats(statsRes.data.stats);
         if (pendingRes.data.success) setPendingLibraries(pendingRes.data.libraries);
         if (forwardedRes.data.success) setForwardedLibraries(forwardedRes.data.libraries);
-        if (pendingOwnersRes.data.success) setPendingOwners(pendingOwnersRes.data.owners);
         if (allLibsRes.data.success) setAllLibraries(allLibsRes.data.libraries);
-        if (usersRes.data.success) setUsersList(usersRes.data.users);
         if (subAdminsRes.data.success) setSubAdmins(subAdminsRes.data.subAdmins);
       }
     } catch (err) {
@@ -141,11 +187,95 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  // Fetch Users with Server-Side Pagination & Filters
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: userPage.toString(),
+        limit: userLimit.toString(),
+        search: userSearch,
+        activity: userActivityFilter,
+        status: userStatusFilter,
+        role: 'USER',
+      });
+
+      const res = await api.get(`/admin/users?${params.toString()}`);
+      if (res.data.success) {
+        setUsersList(res.data.users);
+        setUsersPagination(res.data.pagination);
+      }
+    } catch (err) {
+      console.error('Failed to fetch users', err);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [userPage, userLimit, userSearch, userActivityFilter, userStatusFilter]);
+
+  // Fetch Owners with Server-Side Pagination & Filters
+  const fetchOwners = useCallback(async () => {
+    setOwnersLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: ownerPage.toString(),
+        limit: ownerLimit.toString(),
+        search: ownerSearch,
+        status: ownerStatusFilter,
+        hasLibraries: ownerLibrariesFilter,
+      });
+
+      const res = await api.get(`/admin/owners?${params.toString()}`);
+      if (res.data.success) {
+        setOwnersList(res.data.owners);
+        setOwnersPagination(res.data.pagination);
+      }
+    } catch (err) {
+      console.error('Failed to fetch owners', err);
+    } finally {
+      setOwnersLoading(false);
+    }
+  }, [ownerPage, ownerLimit, ownerSearch, ownerStatusFilter, ownerLibrariesFilter]);
+
   useEffect(() => {
     if (user?.role === 'ADMIN') {
       fetchAdminData();
     }
   }, [user, isSubAdmin]);
+
+  useEffect(() => {
+    if (user?.role === 'ADMIN' && activeTab === 'users') {
+      fetchUsers();
+    }
+  }, [user, activeTab, fetchUsers]);
+
+  useEffect(() => {
+    if (user?.role === 'ADMIN' && activeTab === 'owners') {
+      fetchOwners();
+    }
+  }, [user, activeTab, fetchOwners]);
+
+  // View User Booking History
+  const handleViewUserBookings = async (targetUser: User) => {
+    setSelectedUserForBookings(targetUser);
+    setUserBookingsModalOpen(true);
+    setUserBookingsLoading(true);
+    try {
+      const res = await api.get(`/admin/users/${targetUser.id}/bookings`);
+      if (res.data.success) {
+        setUserBookings(res.data.bookings || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user bookings', err);
+    } finally {
+      setUserBookingsLoading(false);
+    }
+  };
+
+  // View Owner's Listed Libraries
+  const handleViewOwnerLibraries = (targetOwner: User) => {
+    setSelectedOwnerForLibraries(targetOwner);
+    setOwnerLibrariesModalOpen(true);
+  };
 
   // Actions
   const handleApprove = async (id: string) => {
@@ -265,11 +395,13 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  // Approve Owner
   const handleApproveOwner = async (id: string) => {
     try {
       const res = await api.patch(`/admin/owners/${id}/approve`);
       if (res.data.success) {
         alert(res.data.message);
+        fetchOwners();
         fetchAdminData();
       }
     } catch (err: any) {
@@ -277,12 +409,14 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  // Reject Owner
   const handleRejectOwner = async (id: string) => {
     if (!confirm('Are you sure you want to reject this Library Owner application?')) return;
     try {
       const res = await api.patch(`/admin/owners/${id}/reject`);
       if (res.data.success) {
         alert(res.data.message);
+        fetchOwners();
         fetchAdminData();
       }
     } catch (err: any) {
@@ -314,7 +448,7 @@ export const AdminDashboardPage: React.FC = () => {
     );
   }
 
-  // Filtered Directory
+  // Filtered Libraries Directory
   const filteredLibraries = (isSubAdmin ? perLibraryStats : allLibraries).filter((lib) => {
     const matchesSearch =
       lib.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -383,120 +517,114 @@ export const AdminDashboardPage: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
-        {/* KPI Metrics Dashboard */}
-        {isSubAdmin ? (
-          /* Sub-Admin State-Scoped KPIs */
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">
-                State GMV ({assignedState})
+        {/* ======================================================== */}
+        {/* SUMMARY STATISTICS DASHBOARD CARDS */}
+        {/* ======================================================== */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+          {/* 1. Total Registered Users */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Students / Users
               </span>
-              <div className="text-2xl font-extrabold text-slate-900">
-                ₹{stats?.totalGMV?.toLocaleString() || 0}
-              </div>
-              <span className="text-[11px] text-slate-500 font-medium">
-                {stats?.totalBookings || 0} Total Bookings in {assignedState}
-              </span>
+              <Users className="w-4 h-4 text-blue-500" />
             </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">
-                State Platform Fee
-              </span>
-              <div className="text-2xl font-extrabold text-blue-600">
-                ₹{stats?.platformCommissionEarned?.toLocaleString() || 0}
-              </div>
-              <span className="text-[11px] text-slate-400">10% Platform share</span>
+            <div className="text-2xl font-black text-slate-900">
+              {stats?.totalRegisteredUsers ?? stats?.totalUsers ?? 0}
             </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">
-                State Approved Libraries
-              </span>
-              <div className="text-2xl font-extrabold text-emerald-600">
-                {stats?.totalApprovedLibraries || 0}
-              </div>
-              <span className="text-[11px] text-slate-500 font-medium">
-                {stats?.totalDesks || 0} Total Desks Capacity
-              </span>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">
-                Pending State Approvals
-              </span>
-              <div className="text-2xl font-extrabold text-amber-600">
-                {stats?.pendingApprovals || 0}
-              </div>
-              <span className="text-[11px] text-slate-400">
-                {stats?.forwardedApprovals || 0} Escalated to Master
-              </span>
-            </div>
+            <span className="text-[11px] text-slate-500 font-medium block truncate">
+              {stats?.usersWithBookings || 0} active • {stats?.usersWithoutBookings || 0} browsing
+            </span>
           </div>
-        ) : (
-          /* Master Admin Pan-India KPIs */
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">
-                Pan-India Total GMV
-              </span>
-              <div className="text-2xl font-extrabold text-slate-900">
-                ₹{stats?.totalGMV?.toLocaleString() || 0}
-              </div>
-              <span className="text-[11px] text-slate-400">
-                {stats?.totalBookings || 0} Bookings nationwide
-              </span>
-            </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">
+          {/* 2. Total Library Owners */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Library Owners
+              </span>
+              <Building className="w-4 h-4 text-amber-500" />
+            </div>
+            <div className="text-2xl font-black text-slate-900">
+              {stats?.totalLibraryOwners || 0}
+            </div>
+            <span className="text-[11px] text-amber-600 font-medium block truncate">
+              {stats?.approvedOwners || 0} approved • {stats?.pendingOwners || 0} pending
+            </span>
+          </div>
+
+          {/* 3. Total GMV */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                {isSubAdmin ? 'State GMV' : 'Total GMV'}
+              </span>
+              <DollarSign className="w-4 h-4 text-emerald-500" />
+            </div>
+            <div className="text-2xl font-black text-slate-900">
+              ₹{stats?.totalGMV?.toLocaleString() || 0}
+            </div>
+            <span className="text-[11px] text-slate-500 font-medium block truncate">
+              {stats?.totalBookings || 0} Total Bookings
+            </span>
+          </div>
+
+          {/* 4. Platform Fee */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                 Platform Commission
               </span>
-              <div className="text-2xl font-extrabold text-purple-600">
-                ₹{stats?.platformCommissionEarned?.toLocaleString() || 0}
-              </div>
-              <span className="text-[11px] text-slate-400">Net platform revenue</span>
+              <TrendingUp className="w-4 h-4 text-purple-500" />
             </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">
-                Approved Libraries
-              </span>
-              <div className="text-2xl font-extrabold text-emerald-600">
-                {stats?.totalApprovedLibraries || 0}
-              </div>
-              <span className="text-[11px] text-amber-600 font-semibold">
-                {stats?.pendingApprovals || 0} Pending Review
-              </span>
+            <div className="text-2xl font-black text-purple-600">
+              ₹{stats?.platformCommissionEarned?.toLocaleString() || 0}
             </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">
-                Escalated Queue
-              </span>
-              <div className="text-2xl font-extrabold text-rose-600">
-                {stats?.forwardedToMasterCount || 0}
-              </div>
-              <span className="text-[11px] text-rose-500 font-medium">
-                Needs Master Action
-              </span>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">
-                State Sub-Admins
-              </span>
-              <div className="text-2xl font-extrabold text-blue-600">
-                {subAdmins.length} / {SUPPORTED_STATES.length}
-              </div>
-              <span className="text-[11px] text-slate-400">
-                1 Admin per State
-              </span>
-            </div>
+            <span className="text-[11px] text-slate-400 block truncate">10% Platform Revenue</span>
           </div>
-        )}
 
-        {/* Tab Controls */}
+          {/* 5. Approved Libraries */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Active Libraries
+              </span>
+              <CheckCircle className="w-4 h-4 text-emerald-500" />
+            </div>
+            <div className="text-2xl font-black text-emerald-600">
+              {stats?.totalApprovedLibraries || 0}
+            </div>
+            <span className="text-[11px] text-amber-600 font-semibold block truncate">
+              {stats?.pendingApprovals || 0} Pending Review
+            </span>
+          </div>
+
+          {/* 6. State Admins / Escalated Queue */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                {isSubAdmin ? 'Escalations' : 'State Admins'}
+              </span>
+              {isSubAdmin ? (
+                <ShieldAlert className="w-4 h-4 text-rose-500" />
+              ) : (
+                <Users className="w-4 h-4 text-blue-500" />
+              )}
+            </div>
+            <div className="text-2xl font-black text-slate-900">
+              {isSubAdmin
+                ? stats?.forwardedApprovals || 0
+                : `${subAdmins.length} / ${SUPPORTED_STATES.length}`}
+            </div>
+            <span className="text-[11px] text-slate-400 block truncate">
+              {isSubAdmin ? 'Forwarded to Master' : '1 Sub-Admin per State'}
+            </span>
+          </div>
+        </div>
+
+        {/* ======================================================== */}
+        {/* TAB CONTROLS */}
+        {/* ======================================================== */}
         <div className="flex flex-wrap bg-slate-200/80 p-1 rounded-2xl gap-1">
           {/* Sub-Admin Tabs */}
           {isSubAdmin ? (
@@ -509,7 +637,7 @@ export const AdminDashboardPage: React.FC = () => {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                📋 State Verification Queue ({pendingLibraries.length})
+                📋 State Approvals ({pendingLibraries.length})
               </button>
               <button
                 onClick={() => setActiveTab('breakdown')}
@@ -519,17 +647,29 @@ export const AdminDashboardPage: React.FC = () => {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🏢 State Libraries & Revenue Breakdown ({perLibraryStats.length})
+                🏢 State Libraries & Revenue ({perLibraryStats.length})
               </button>
               <button
                 onClick={() => setActiveTab('users')}
-                className={`px-4 py-2 text-xs font-bold rounded-xl transition ${
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-1.5 ${
                   activeTab === 'users'
                     ? 'bg-white text-blue-700 shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                👥 State Users & Owners ({usersList.length})
+                <Users className="w-3.5 h-3.5 text-blue-600" />
+                👥 User Management
+              </button>
+              <button
+                onClick={() => setActiveTab('owners')}
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-1.5 ${
+                  activeTab === 'owners'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Building className="w-3.5 h-3.5 text-amber-600" />
+                🏢 Owner Management
               </button>
             </>
           ) : (
@@ -565,17 +705,7 @@ export const AdminDashboardPage: React.FC = () => {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                📋 Pan-India Verification Queue ({pendingLibraries.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('owners')}
-                className={`px-4 py-2 text-xs font-bold rounded-xl transition ${
-                  activeTab === 'owners'
-                    ? 'bg-white text-amber-700 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                👤 Owner Approvals ({pendingOwners.length})
+                📋 Pan-India Queue ({pendingLibraries.length})
               </button>
               <button
                 onClick={() => setActiveTab('libraries')}
@@ -585,24 +715,573 @@ export const AdminDashboardPage: React.FC = () => {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                🏢 All Libraries & Revenue ({allLibraries.length})
+                🏢 Libraries & Revenue ({allLibraries.length})
               </button>
               <button
                 onClick={() => setActiveTab('users')}
-                className={`px-4 py-2 text-xs font-bold rounded-xl transition ${
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-1.5 ${
                   activeTab === 'users'
                     ? 'bg-white text-purple-700 shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                👥 Users ({usersList.length})
+                <Users className="w-3.5 h-3.5 text-blue-600" />
+                👥 User Management
+              </button>
+              <button
+                onClick={() => setActiveTab('owners')}
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-1.5 ${
+                  activeTab === 'owners'
+                    ? 'bg-white text-purple-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Building className="w-3.5 h-3.5 text-amber-600" />
+                🏢 Owner Management
               </button>
             </>
           )}
         </div>
 
         {/* ======================================================== */}
-        {/* TAB 1: FORWARDED TO MASTER (Master Admin Only) */}
+        {/* TAB 1: USER MANAGEMENT (With Search, Filter, Server-Side Pagination & Booking History) */}
+        {/* ======================================================== */}
+        {activeTab === 'users' && (
+          <div className="space-y-4">
+            {/* Header & Sub-Bar */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  User Management (Registered Students & Members)
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Complete directory of all registered users, including active bookers and users who have never booked.
+                </p>
+              </div>
+
+              {/* Badges Overview */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-3 py-1 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
+                  Total Users: {usersPagination.totalCount}
+                </span>
+                <span className="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                  Active Bookers: {stats?.usersWithBookings || 0}
+                </span>
+                <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 text-xs font-bold">
+                  Zero Bookings: {stats?.usersWithoutBookings || 0}
+                </span>
+              </div>
+            </div>
+
+            {/* Search & Filter Controls */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+              {/* Search Box */}
+              <div className="relative w-full md:w-80">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, phone..."
+                  value={userSearch}
+                  onChange={(e) => {
+                    setUserSearch(e.target.value);
+                    setUserPage(1);
+                  }}
+                  className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                {/* Activity Filter */}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="font-bold text-slate-500">Activity:</span>
+                  <select
+                    value={userActivityFilter}
+                    onChange={(e: any) => {
+                      setUserActivityFilter(e.target.value);
+                      setUserPage(1);
+                    }}
+                    className="p-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="ALL">All Users (With & Without Bookings)</option>
+                    <option value="WITH_BOOKINGS">Active Bookers (Bookings ≥ 1)</option>
+                    <option value="NO_BOOKINGS">Zero Bookings (Never Booked)</option>
+                  </select>
+                </div>
+
+                {/* Status Filter */}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="font-bold text-slate-500">Status:</span>
+                  <select
+                    value={userStatusFilter}
+                    onChange={(e) => {
+                      setUserStatusFilter(e.target.value);
+                      setUserPage(1);
+                    }}
+                    className="p-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="APPROVED">Active / Approved</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="REJECTED">Suspended / Rejected</option>
+                  </select>
+                </div>
+
+                {/* Limit Selector */}
+                <select
+                  value={userLimit}
+                  onChange={(e) => {
+                    setUserLimit(Number(e.target.value));
+                    setUserPage(1);
+                  }}
+                  className="p-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={10}>10 per page</option>
+                  <option value={20}>20 per page</option>
+                  <option value={50}>50 per page</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Users Table */}
+            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-extrabold uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3.5 px-4">Student Profile</th>
+                      <th className="py-3.5 px-4">Contact Info</th>
+                      <th className="py-3.5 px-4">Registration Date</th>
+                      <th className="py-3.5 px-4 text-center">Account Status</th>
+                      <th className="py-3.5 px-4 text-center">Total Bookings</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {usersLoading ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-400">
+                          <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                          Loading users from database...
+                        </td>
+                      </tr>
+                    ) : usersList.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-400">
+                          <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                          No registered users found matching the selected filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      usersList.map((u) => (
+                        <tr key={u.id} className="hover:bg-slate-50/50 transition">
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={u.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name)}`}
+                                alt={u.name}
+                                className="w-9 h-9 rounded-full object-cover border border-slate-200"
+                              />
+                              <div>
+                                <span className="font-bold text-slate-900 text-xs block">{u.name}</span>
+                                <span className="text-[10px] text-blue-600 font-semibold uppercase tracking-wider">
+                                  STUDENT
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="space-y-0.5">
+                              <span className="text-slate-800 font-mono text-[11px] block">{u.email}</span>
+                              <span className="text-slate-500 text-[11px] block">{u.phone || 'No phone registered'}</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600">
+                            {u.createdAt ? (
+                              <div>
+                                <span className="font-medium text-slate-800 block">
+                                  {new Date(u.createdAt).toLocaleDateString(undefined, {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  {new Date(u.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span
+                              className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                                u.approvalStatus === 'APPROVED' || u.isApproved !== false
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : u.approvalStatus === 'PENDING'
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}
+                            >
+                              {u.approvalStatus || (u.isApproved !== false ? 'ACTIVE' : 'PENDING')}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {(u.totalBookings || 0) > 0 ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200 text-[11px]">
+                                {u.totalBookings} Bookings
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-400 font-medium text-[11px]">
+                                0 Bookings
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <button
+                              onClick={() => handleViewUserBookings(u)}
+                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 border border-blue-200"
+                            >
+                              <BookOpen className="w-3.5 h-3.5" />
+                              View Bookings ({u.totalBookings || 0})
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Server-Side Pagination Bar */}
+              <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+                <div>
+                  Showing{' '}
+                  <strong>
+                    {usersPagination.totalCount === 0
+                      ? 0
+                      : (usersPagination.currentPage - 1) * usersPagination.limit + 1}
+                  </strong>{' '}
+                  to{' '}
+                  <strong>
+                    {Math.min(
+                      usersPagination.currentPage * usersPagination.limit,
+                      usersPagination.totalCount
+                    )}
+                  </strong>{' '}
+                  of <strong>{usersPagination.totalCount}</strong> registered users
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={usersPagination.currentPage <= 1 || usersLoading}
+                    onClick={() => setUserPage((p) => Math.max(1, p - 1))}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="px-3 py-1 font-bold text-slate-700">
+                    Page {usersPagination.currentPage} of {usersPagination.totalPages || 1}
+                  </span>
+                  <button
+                    disabled={
+                      usersPagination.currentPage >= usersPagination.totalPages || usersLoading
+                    }
+                    onClick={() => setUserPage((p) => p + 1)}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* TAB 2: OWNER MANAGEMENT (With Search, Filter, Server-Side Pagination & Listed Libraries) */}
+        {/* ======================================================== */}
+        {activeTab === 'owners' && (
+          <div className="space-y-4">
+            {/* Header & Sub-Bar */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Building className="w-5 h-5 text-amber-600" />
+                  Owner Management (Library Space Partners)
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Complete directory of all registered library owners, including newly registered owners who have not listed any libraries yet.
+                </p>
+              </div>
+
+              {/* Badges Overview */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-3 py-1 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">
+                  Total Owners: {ownersPagination.totalCount}
+                </span>
+                <span className="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                  Approved: {stats?.approvedOwners || 0}
+                </span>
+                <span className="px-3 py-1 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold">
+                  Pending Verification: {stats?.pendingOwners || 0}
+                </span>
+              </div>
+            </div>
+
+            {/* Search & Filter Controls */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+              {/* Search Box */}
+              <div className="relative w-full md:w-80">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Search by owner name, email, phone..."
+                  value={ownerSearch}
+                  onChange={(e) => {
+                    setOwnerSearch(e.target.value);
+                    setOwnerPage(1);
+                  }}
+                  className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                {/* Approval Status Filter */}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="font-bold text-slate-500">Status:</span>
+                  <select
+                    value={ownerStatusFilter}
+                    onChange={(e) => {
+                      setOwnerStatusFilter(e.target.value);
+                      setOwnerPage(1);
+                    }}
+                    className="p-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="ALL">All Verification Statuses</option>
+                    <option value="APPROVED">Approved & Verified</option>
+                    <option value="PENDING">Pending Approval</option>
+                    <option value="REJECTED">Rejected</option>
+                  </select>
+                </div>
+
+                {/* Libraries Filter */}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="font-bold text-slate-500">Libraries:</span>
+                  <select
+                    value={ownerLibrariesFilter}
+                    onChange={(e: any) => {
+                      setOwnerLibrariesFilter(e.target.value);
+                      setOwnerPage(1);
+                    }}
+                    className="p-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="ALL">All Owners (With & Without Libraries)</option>
+                    <option value="YES">Has Listed Libraries (≥ 1)</option>
+                    <option value="NO">No Libraries Listed (0)</option>
+                  </select>
+                </div>
+
+                {/* Limit Selector */}
+                <select
+                  value={ownerLimit}
+                  onChange={(e) => {
+                    setOwnerLimit(Number(e.target.value));
+                    setOwnerPage(1);
+                  }}
+                  className="p-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value={10}>10 per page</option>
+                  <option value={20}>20 per page</option>
+                  <option value={50}>50 per page</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Owners Table */}
+            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-extrabold uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3.5 px-4">Owner Profile</th>
+                      <th className="py-3.5 px-4">Contact Info</th>
+                      <th className="py-3.5 px-4">Registration Date</th>
+                      <th className="py-3.5 px-4 text-center">Verification Status</th>
+                      <th className="py-3.5 px-4 text-center">Libraries Listed</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {ownersLoading ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-400">
+                          <div className="animate-spin w-6 h-6 border-2 border-amber-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                          Loading owners from database...
+                        </td>
+                      </tr>
+                    ) : ownersList.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-400">
+                          <Building className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                          No library owners found matching the selected filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      ownersList.map((o) => (
+                        <tr key={o.id} className="hover:bg-slate-50/50 transition">
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={o.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(o.name)}`}
+                                alt={o.name}
+                                className="w-9 h-9 rounded-full object-cover border border-slate-200"
+                              />
+                              <div>
+                                <span className="font-bold text-slate-900 text-xs block">{o.name}</span>
+                                <span className="text-[10px] text-amber-600 font-semibold uppercase tracking-wider">
+                                  LIBRARY OWNER
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="space-y-0.5">
+                              <span className="text-slate-800 font-mono text-[11px] block">{o.email}</span>
+                              <span className="text-slate-500 text-[11px] block">{o.phone || 'No phone registered'}</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600">
+                            {o.createdAt ? (
+                              <div>
+                                <span className="font-medium text-slate-800 block">
+                                  {new Date(o.createdAt).toLocaleDateString(undefined, {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span
+                              className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                                o.approvalStatus === 'APPROVED'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : o.approvalStatus === 'PENDING'
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}
+                            >
+                              {o.approvalStatus || 'PENDING'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {(o.librariesCount || 0) > 0 ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold border border-amber-200 text-[11px]">
+                                {o.librariesCount} Libraries Listed
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-400 font-medium text-[11px]">
+                                0 Libraries (New Partner)
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {o.approvalStatus === 'PENDING' && (
+                                <>
+                                  <button
+                                    onClick={() => handleApproveOwner(o.id)}
+                                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold shadow-sm transition flex items-center gap-1"
+                                    title="Approve Owner Account"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={() => handleRejectOwner(o.id)}
+                                    className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-[11px] font-bold transition flex items-center gap-1"
+                                    title="Reject Owner Account"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                    Reject
+                                  </button>
+                                </>
+                              )}
+
+                              <button
+                                onClick={() => handleViewOwnerLibraries(o)}
+                                className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 border border-amber-200"
+                              >
+                                <Building className="w-3.5 h-3.5" />
+                                View Libraries ({o.librariesCount || 0})
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Server-Side Pagination Bar */}
+              <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+                <div>
+                  Showing{' '}
+                  <strong>
+                    {ownersPagination.totalCount === 0
+                      ? 0
+                      : (ownersPagination.currentPage - 1) * ownersPagination.limit + 1}
+                  </strong>{' '}
+                  to{' '}
+                  <strong>
+                    {Math.min(
+                      ownersPagination.currentPage * ownersPagination.limit,
+                      ownersPagination.totalCount
+                    )}
+                  </strong>{' '}
+                  of <strong>{ownersPagination.totalCount}</strong> registered library owners
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={ownersPagination.currentPage <= 1 || ownersLoading}
+                    onClick={() => setOwnerPage((p) => Math.max(1, p - 1))}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="px-3 py-1 font-bold text-slate-700">
+                    Page {ownersPagination.currentPage} of {ownersPagination.totalPages || 1}
+                  </span>
+                  <button
+                    disabled={
+                      ownersPagination.currentPage >= ownersPagination.totalPages || ownersLoading
+                    }
+                    onClick={() => setOwnerPage((p) => p + 1)}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* TAB 3: FORWARDED TO MASTER (Master Admin Only) */}
         {/* ======================================================== */}
         {!isSubAdmin && activeTab === 'forwarded' && (
           <div className="space-y-4">
@@ -718,7 +1397,7 @@ export const AdminDashboardPage: React.FC = () => {
         )}
 
         {/* ======================================================== */}
-        {/* TAB 2: STATE SUB-ADMINS (Master Admin Only) */}
+        {/* TAB 4: STATE SUB-ADMINS (Master Admin Only) */}
         {/* ======================================================== */}
         {!isSubAdmin && activeTab === 'subadmins' && (
           <div className="space-y-6">
@@ -828,7 +1507,7 @@ export const AdminDashboardPage: React.FC = () => {
         )}
 
         {/* ======================================================== */}
-        {/* TAB 3: VERIFICATION QUEUE (Sub-Admin & Master Admin) */}
+        {/* TAB 5: VERIFICATION QUEUE (Sub-Admin & Master Admin) */}
         {/* ======================================================== */}
         {activeTab === 'queue' && (
           <div className="space-y-4">
@@ -940,7 +1619,7 @@ export const AdminDashboardPage: React.FC = () => {
         )}
 
         {/* ======================================================== */}
-        {/* TAB 4: STATE LIBRARIES & REVENUE BREAKDOWN (Sub-Admin) */}
+        {/* TAB 6: STATE LIBRARIES & REVENUE BREAKDOWN (Sub-Admin) */}
         {/* ======================================================== */}
         {isSubAdmin && activeTab === 'breakdown' && (
           <div className="space-y-4">
@@ -1040,7 +1719,7 @@ export const AdminDashboardPage: React.FC = () => {
         )}
 
         {/* ======================================================== */}
-        {/* TAB 5: ALL LIBRARIES DIRECTORY & REVENUE (Master Admin) */}
+        {/* TAB 7: ALL LIBRARIES DIRECTORY & REVENUE (Master Admin) */}
         {/* ======================================================== */}
         {!isSubAdmin && activeTab === 'libraries' && (
           <div className="space-y-4">
@@ -1162,120 +1841,233 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* ======================================================== */}
-        {/* TAB 6: OWNER APPROVALS (Master Admin Only) */}
-        {/* ======================================================== */}
-        {!isSubAdmin && activeTab === 'owners' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Building className="w-5 h-5 text-amber-600" />
-              Library Owners Awaiting Admin Approval
-            </h2>
-
-            {pendingOwners.length === 0 ? (
-              <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center space-y-2">
-                <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto" />
-                <h3 className="text-sm font-bold text-slate-800">All Owners Approved!</h3>
-                <p className="text-xs text-slate-400">No new library owners pending verification.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {pendingOwners.map((owner) => (
-                  <div
-                    key={owner.id}
-                    className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-slate-900 text-base">{owner.name}</h3>
-                        <span className="text-[10px] font-extrabold bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full border border-amber-200">
-                          PENDING VERIFICATION
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        Email: <strong>{owner.email}</strong> • Phone: {owner.phone || 'N/A'}
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        Submitted on: {new Date(owner.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                      <button
-                        onClick={() => handleApproveOwner(owner.id)}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center gap-1.5"
-                      >
-                        <Check className="w-4 h-4" />
-                        Approve Owner
-                      </button>
-                      <button
-                        onClick={() => handleRejectOwner(owner.id)}
-                        className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
-                      >
-                        <X className="w-4 h-4" />
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ======================================================== */}
-        {/* TAB 7: USERS DIRECTORY */}
-        {/* ======================================================== */}
-        {activeTab === 'users' && (
-          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-100 font-bold text-sm text-slate-900 flex items-center justify-between">
-              <span>{isSubAdmin ? `Users in ${assignedState}` : 'Registered Platform Users'}</span>
-              <span className="text-xs font-medium text-slate-400">
-                Total: {usersList.length}
-              </span>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {usersList.map((u) => (
-                <div key={u.id} className="p-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={u.avatar || 'https://api.dicebear.com/7.x/initials/svg?seed=U'}
-                      alt={u.name}
-                      className="w-9 h-9 rounded-full object-cover"
-                    />
-                    <div>
-                      <span className="font-bold text-xs text-slate-900 block">{u.name}</span>
-                      <span className="text-[11px] text-slate-400">{u.email}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {u.adminType && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                        {u.adminType}
-                      </span>
-                    )}
-                    <span
-                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                        u.role === 'ADMIN'
-                          ? 'bg-purple-100 text-purple-800'
-                          : u.role === 'OWNER'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {u.role}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ======================================================== */}
-      {/* MODAL 1: FORWARD TO MASTER ADMIN (Sub-Admin Only) */}
+      {/* MODAL 1: USER BOOKING HISTORY MODAL */}
+      {/* ======================================================== */}
+      {userBookingsModalOpen && selectedUserForBookings && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 space-y-5 shadow-2xl border border-slate-100 max-h-[85vh] flex flex-col animate-in fade-in duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <img
+                  src={
+                    selectedUserForBookings.avatar ||
+                    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+                      selectedUserForBookings.name
+                    )}`
+                  }
+                  alt={selectedUserForBookings.name}
+                  className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                />
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">
+                    {selectedUserForBookings.name}'s Booking History
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    {selectedUserForBookings.email} • {selectedUserForBookings.phone || 'No phone'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setUserBookingsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Bookings List Content */}
+            <div className="overflow-y-auto flex-1 space-y-3 pr-1">
+              {userBookingsLoading ? (
+                <div className="py-12 text-center text-slate-400">
+                  <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                  Fetching complete booking records...
+                </div>
+              ) : userBookings.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 bg-slate-50/70 rounded-2xl border border-slate-100 space-y-2">
+                  <BookOpen className="w-10 h-10 text-slate-300 mx-auto" />
+                  <h4 className="font-bold text-slate-700 text-sm">No Bookings Found</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                    This user has registered on LibSpace but has not reserved any desk yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {userBookings.map((b) => (
+                    <div
+                      key={b.id}
+                      className="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-black bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
+                            {b.bookingCode}
+                          </span>
+                          <span className="font-bold text-slate-900 text-sm">
+                            {b.library?.name || 'Library Space'}
+                          </span>
+                          <span className="text-[11px] text-slate-400">({b.library?.city})</span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          Seat: <strong>{b.seat?.seatNumber || 'Assigned'}</strong> ({b.seat?.seatType || 'STANDARD'}) • Type: <strong>{b.bookingType || 'HOURLY'}</strong>
+                        </p>
+                        <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {b.date} • {b.startTime} - {b.endTime}
+                        </p>
+                      </div>
+
+                      <div className="text-right sm:self-center">
+                        <div className="text-base font-black text-slate-900">
+                          ₹{b.totalAmount}
+                        </div>
+                        <span
+                          className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
+                            b.status === 'CONFIRMED' || b.status === 'CHECKED_IN' || b.status === 'COMPLETED'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}
+                        >
+                          {b.status}
+                        </span>
+                        {b.payment && (
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            {b.payment.paymentMethod} • {b.payment.paymentStatus}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs text-slate-500">
+              <span>Total Bookings Recorded: {userBookings.length}</span>
+              <button
+                onClick={() => setUserBookingsModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 2: OWNER'S LISTED LIBRARIES MODAL */}
+      {/* ======================================================== */}
+      {ownerLibrariesModalOpen && selectedOwnerForLibraries && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl border border-slate-100 max-h-[85vh] flex flex-col animate-in fade-in duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <img
+                  src={
+                    selectedOwnerForLibraries.avatar ||
+                    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+                      selectedOwnerForLibraries.name
+                    )}`
+                  }
+                  alt={selectedOwnerForLibraries.name}
+                  className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                />
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">
+                    {selectedOwnerForLibraries.name}'s Listed Libraries
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    {selectedOwnerForLibraries.email} • {selectedOwnerForLibraries.phone || 'No phone'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setOwnerLibrariesModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Libraries List Content */}
+            <div className="overflow-y-auto flex-1 space-y-3 pr-1">
+              {!selectedOwnerForLibraries.ownedLibraries ||
+              selectedOwnerForLibraries.ownedLibraries.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 bg-slate-50/70 rounded-2xl border border-slate-100 space-y-2">
+                  <Building className="w-10 h-10 text-slate-300 mx-auto" />
+                  <h4 className="font-bold text-slate-700 text-sm">No Libraries Listed Yet</h4>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                    This library owner has registered on LibSpace but has not submitted any library branches yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedOwnerForLibraries.ownedLibraries.map((lib) => (
+                    <div
+                      key={lib.id}
+                      className="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-black bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">
+                            {lib.lid || 'NO-LID'}
+                          </span>
+                          <h4 className="font-black text-slate-900 text-sm">{lib.name}</h4>
+                          <span
+                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                              lib.status === 'APPROVED'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : lib.status === 'PENDING'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                            }`}
+                          >
+                            {lib.status}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {lib.city}, <strong>{lib.state}</strong> • Capacity: <strong>{lib.totalSeats} Desks</strong>
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Hourly Rate: <strong>₹{lib.hourlyRate}/hr</strong>
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block">
+                          Listed on {new Date(lib.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs text-slate-500">
+              <span>
+                Total Branches: {selectedOwnerForLibraries.ownedLibraries?.length || 0}
+              </span>
+              <button
+                onClick={() => setOwnerLibrariesModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 3: FORWARD TO MASTER ADMIN (Sub-Admin Only) */}
       {/* ======================================================== */}
       {isForwardModalOpen && libraryToForward && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1356,7 +2148,7 @@ export const AdminDashboardPage: React.FC = () => {
       )}
 
       {/* ======================================================== */}
-      {/* MODAL 2: CREATE STATE SUB-ADMIN (Master Admin Only) */}
+      {/* MODAL 4: CREATE STATE SUB-ADMIN (Master Admin Only) */}
       {/* ======================================================== */}
       {isCreateSubAdminModalOpen && !isSubAdmin && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">

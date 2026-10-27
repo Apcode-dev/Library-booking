@@ -9,6 +9,30 @@ export interface User {
   avatar?: string;
   adminType?: 'MASTER_ADMIN' | 'SUB_ADMIN' | string;
   assignedState?: string | null;
+  isApproved?: boolean;
+  approvalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED' | string;
+  createdAt?: string;
+  totalBookings?: number;
+  librariesCount?: number;
+  ownedLibraries?: Array<{
+    id: string;
+    lid?: string;
+    name: string;
+    city: string;
+    state: string;
+    status: string;
+    totalSeats: number;
+    hourlyRate: number;
+    createdAt: string;
+  }>;
+  bookings?: any[];
+}
+
+export interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  limit: number;
 }
 
 export interface Library {

@@ -26,6 +26,11 @@ export class AdminController {
           stateBookingsCount,
           statePayments,
           recentStateBookings,
+          totalRegisteredUsers,
+          usersWithBookings,
+          totalLibraryOwners,
+          pendingOwnersCount,
+          approvedOwnersCount,
         ] = await Promise.all([
           prisma.library.count({ where: { state: assignedState } }),
           prisma.library.count({ where: { state: assignedState, status: 'APPROVED' } }),
@@ -74,6 +79,11 @@ export class AdminController {
               payment: true,
             },
           }),
+          prisma.user.count({ where: { role: 'USER' } }),
+          prisma.user.count({ where: { role: 'USER', bookings: { some: {} } } }),
+          prisma.user.count({ where: { role: 'OWNER' } }),
+          prisma.user.count({ where: { role: 'OWNER', approvalStatus: 'PENDING' } }),
+          prisma.user.count({ where: { role: 'OWNER', approvalStatus: 'APPROVED' } }),
         ]);
 
         const stateGMV = statePayments.reduce((acc, p) => acc + p.amount, 0);
@@ -121,6 +131,12 @@ export class AdminController {
             totalDesks: totalStateDesks,
             totalGMV: parseFloat(stateGMV.toFixed(2)),
             platformCommissionEarned: parseFloat(stateCommission.toFixed(2)),
+            totalRegisteredUsers,
+            usersWithBookings,
+            usersWithoutBookings: totalRegisteredUsers - usersWithBookings,
+            totalLibraryOwners,
+            approvedOwners: approvedOwnersCount,
+            pendingOwners: pendingOwnersCount,
           },
           perLibraryStats,
           recentBookings: recentStateBookings,
@@ -133,6 +149,12 @@ export class AdminController {
       // ==========================================
       const [
         totalUsers,
+        totalRegisteredUsers,
+        usersWithBookings,
+        totalLibraryOwners,
+        pendingOwnersCount,
+        approvedOwnersCount,
+        ownersWithLibraries,
         totalLibraries,
         pendingLibraries,
         forwardedToMasterCount,
@@ -143,6 +165,12 @@ export class AdminController {
         recentBookings,
       ] = await Promise.all([
         prisma.user.count(),
+        prisma.user.count({ where: { role: 'USER' } }),
+        prisma.user.count({ where: { role: 'USER', bookings: { some: {} } } }),
+        prisma.user.count({ where: { role: 'OWNER' } }),
+        prisma.user.count({ where: { role: 'OWNER', approvalStatus: 'PENDING' } }),
+        prisma.user.count({ where: { role: 'OWNER', approvalStatus: 'APPROVED' } }),
+        prisma.user.count({ where: { role: 'OWNER', ownedLibraries: { some: {} } } }),
         prisma.library.count({ where: { status: 'APPROVED' } }),
         prisma.library.count({ where: { status: 'PENDING' } }),
         prisma.library.count({ where: { status: 'FORWARDED_TO_MASTER' } }),
@@ -202,6 +230,14 @@ export class AdminController {
         isSubAdmin: false,
         stats: {
           totalUsers,
+          totalRegisteredUsers,
+          usersWithBookings,
+          usersWithoutBookings: totalRegisteredUsers - usersWithBookings,
+          totalLibraryOwners,
+          approvedOwners: approvedOwnersCount,
+          pendingOwners: pendingOwnersCount,
+          ownersWithLibraries,
+          ownersWithoutLibraries: totalLibraryOwners - ownersWithLibraries,
           totalApprovedLibraries: totalLibraries,
           pendingApprovals: pendingLibraries,
           forwardedToMasterCount,
@@ -693,48 +729,102 @@ export class AdminController {
   }
 
   /**
-   * Manage users (list all users, count bookings)
+   * USER MANAGEMENT:
+   * List all registered users (including those with 0 bookings).
+   * Supports search (name, email, phone), activity filter (all / with bookings / no bookings),
+   * status filter, and server-side pagination.
    */
   static async getAllUsers(req: Request, res: Response): Promise<void> {
     try {
-      const { role } = req.query;
-      const isSubAdmin = req.user?.adminType === 'SUB_ADMIN';
-      const assignedState = req.user?.assignedState;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string) || 10));
+      const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+      const role = typeof req.query.role === 'string' ? req.query.role : 'USER';
+      const activity = typeof req.query.activity === 'string' ? req.query.activity : 'ALL';
+      const status = typeof req.query.status === 'string' ? req.query.status : 'ALL';
 
       const whereClause: any = {};
-      if (role && typeof role === 'string' && role !== 'ALL') {
+
+      if (role && role !== 'ALL') {
         whereClause.role = role;
       }
 
-      // If Sub-Admin, show users connected to their state (owners with libraries in that state or users who booked in that state)
-      if (isSubAdmin && assignedState) {
-        whereClause.OR = [
-          { ownedLibraries: { some: { state: assignedState } } },
-          { bookings: { some: { library: { state: assignedState } } } },
+      if (status && status !== 'ALL') {
+        whereClause.approvalStatus = status;
+      }
+
+      if (activity === 'WITH_BOOKINGS') {
+        whereClause.bookings = { some: {} };
+      } else if (activity === 'NO_BOOKINGS') {
+        whereClause.bookings = { none: {} };
+      }
+
+      if (search) {
+        whereClause.AND = [
+          ...(whereClause.AND || []),
+          {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+              { phone: { contains: search, mode: 'insensitive' } },
+            ],
+          },
         ];
       }
 
-      const users = await prisma.user.findMany({
-        where: whereClause,
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          phone: true,
-          avatar: true,
-          createdAt: true,
-          _count: {
-            select: { bookings: true, ownedLibraries: true },
+      const [totalCount, users] = await Promise.all([
+        prisma.user.count({ where: whereClause }),
+        prisma.user.findMany({
+          where: whereClause,
+          skip: (page - 1) * limit,
+          take: limit,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            role: true,
+            isApproved: true,
+            approvalStatus: true,
+            avatar: true,
+            createdAt: true,
+            _count: {
+              select: { bookings: true, ownedLibraries: true },
+            },
+            bookings: {
+              take: 3,
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                bookingCode: true,
+                date: true,
+                startTime: true,
+                endTime: true,
+                status: true,
+                totalAmount: true,
+                library: {
+                  select: { id: true, lid: true, name: true, city: true },
+                },
+              },
+            },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+          orderBy: { createdAt: 'desc' },
+        }),
+      ]);
 
       res.json({
         success: true,
-        count: users.length,
-        users,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalCount / limit) || 1,
+          totalCount,
+          limit,
+        },
+        users: users.map((u) => ({
+          ...u,
+          totalBookings: u._count.bookings,
+          librariesCount: u._count.ownedLibraries,
+        })),
       });
     } catch (error: any) {
       res.status(500).json({ success: false, message: 'Failed to fetch users', error: error.message });
@@ -742,7 +832,179 @@ export class AdminController {
   }
 
   /**
-   * Get all Library Owners awaiting Admin Approval
+   * USER MANAGEMENT - BOOKING HISTORY:
+   * Fetch complete historical reservations made by a specific user.
+   */
+  static async getUserBookings(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      const targetUser = await prisma.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          avatar: true,
+          createdAt: true,
+          isApproved: true,
+          approvalStatus: true,
+        },
+      });
+
+      if (!targetUser) {
+        res.status(404).json({ success: false, message: 'User not found' });
+        return;
+      }
+
+      const bookings = await prisma.booking.findMany({
+        where: { userId: id },
+        include: {
+          library: {
+            select: {
+              id: true,
+              lid: true,
+              name: true,
+              city: true,
+              state: true,
+              address: true,
+            },
+          },
+          seat: {
+            select: {
+              id: true,
+              seatNumber: true,
+              seatType: true,
+              category: true,
+            },
+          },
+          payment: {
+            select: {
+              id: true,
+              amount: true,
+              paymentStatus: true,
+              paymentMethod: true,
+              transactionId: true,
+              createdAt: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      res.json({
+        success: true,
+        user: targetUser,
+        totalBookings: bookings.length,
+        bookings,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to fetch user bookings', error: error.message });
+    }
+  }
+
+  /**
+   * OWNER MANAGEMENT:
+   * List all registered library owners (including those with 0 libraries listed).
+   * Supports search (name, email, phone), approvalStatus filter, hasLibraries filter,
+   * and server-side pagination.
+   */
+  static async getAllOwners(req: Request, res: Response): Promise<void> {
+    try {
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string) || 10));
+      const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+      const status = typeof req.query.status === 'string' ? req.query.status : 'ALL';
+      const hasLibraries = typeof req.query.hasLibraries === 'string' ? req.query.hasLibraries : 'ALL';
+
+      const whereClause: any = {
+        role: 'OWNER',
+      };
+
+      if (status && status !== 'ALL') {
+        whereClause.approvalStatus = status;
+      }
+
+      if (hasLibraries === 'YES') {
+        whereClause.ownedLibraries = { some: {} };
+      } else if (hasLibraries === 'NO') {
+        whereClause.ownedLibraries = { none: {} };
+      }
+
+      if (search) {
+        whereClause.AND = [
+          ...(whereClause.AND || []),
+          {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+              { phone: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        ];
+      }
+
+      const [totalCount, owners] = await Promise.all([
+        prisma.user.count({ where: whereClause }),
+        prisma.user.findMany({
+          where: whereClause,
+          skip: (page - 1) * limit,
+          take: limit,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            role: true,
+            isApproved: true,
+            approvalStatus: true,
+            avatar: true,
+            createdAt: true,
+            _count: {
+              select: { ownedLibraries: true },
+            },
+            ownedLibraries: {
+              select: {
+                id: true,
+                lid: true,
+                name: true,
+                city: true,
+                state: true,
+                address: true,
+                status: true,
+                totalSeats: true,
+                hourlyRate: true,
+                createdAt: true,
+              },
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+      ]);
+
+      res.json({
+        success: true,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalCount / limit) || 1,
+          totalCount,
+          limit,
+        },
+        owners: owners.map((o) => ({
+          ...o,
+          librariesCount: o._count.ownedLibraries,
+        })),
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to fetch owners', error: error.message });
+    }
+  }
+
+  /**
+   * Get all Library Owners awaiting Admin Approval (legacy pending endpoint)
    */
   static async getPendingOwners(_req: Request, res: Response): Promise<void> {
     try {

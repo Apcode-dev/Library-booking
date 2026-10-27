@@ -22,12 +22,14 @@ router.post('/sub-admins', AdminController.createSubAdmin);
 router.put('/sub-admins/:id', AdminController.updateSubAdmin);
 router.delete('/sub-admins/:id', AdminController.deleteSubAdmin);
 
-// Library Owner Verification & Approvals (Gate check)
+// Library Owner Management & Verification
+router.get('/owners', AdminController.getAllOwners);
 router.get('/owners/pending', AdminController.getPendingOwners);
 router.patch('/owners/:id/approve', AdminController.approveOwner);
 router.patch('/owners/:id/reject', AdminController.rejectOwner);
 
-// User Moderation
+// User Management & Reservation History
 router.get('/users', AdminController.getAllUsers);
+router.get('/users/:id/bookings', AdminController.getUserBookings);
 
 export default router;
