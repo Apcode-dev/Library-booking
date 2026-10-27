@@ -259,33 +259,23 @@ export const HomePage: React.FC = () => {
                 No physical queues, zero double-booking risk. Pick your exact desk, reserve with transactional lock protection, and check in with contactless digital QR passes.
               </p>
 
-              {/* Direct Quick Action Buttons for 3 Roles */}
+              {/* Primary Student Call-to-Action */}
               <div className="pt-2 pb-1 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => openAuth('USER', 'register')}
-                  className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-xl shadow-blue-500/25 transition transform hover:-translate-y-0.5 flex items-center gap-2"
+                  className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-xl shadow-blue-500/25 transition transform hover:-translate-y-0.5 flex items-center gap-2"
                 >
-                  <span>🎓 Join as Student (Free)</span>
+                  <span>🎓 Join as Student (Free Account)</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => openAuth('OWNER', 'register')}
-                  className="px-5 py-2.5 rounded-2xl bg-amber-600/90 hover:bg-amber-600 text-white font-bold text-xs sm:text-sm border border-amber-400/30 shadow-lg shadow-amber-600/20 transition transform hover:-translate-y-0.5 flex items-center gap-2"
+                  onClick={() => openAuth('USER', 'login')}
+                  className="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 font-semibold text-xs sm:text-sm border border-white/15 backdrop-blur-md transition flex items-center gap-1.5"
                 >
-                  <Building2 className="w-4 h-4 text-yellow-300" />
-                  <span>🏢 List Your Library (Owner)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => openAuth('ADMIN', 'login')}
-                  className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 font-semibold text-xs border border-white/10 transition flex items-center gap-1.5"
-                >
-                  <ShieldCheck className="w-4 h-4 text-purple-400" />
-                  <span>🛡️ Admin Portal</span>
+                  <span>Student Sign In</span>
                 </button>
               </div>
             </>
