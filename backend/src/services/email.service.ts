@@ -163,6 +163,72 @@ export class EmailService {
   }
 
   /**
+   * Dispatches a 6-digit OTP to the Library Owner for resetting their Library Security PIN.
+   */
+  static async sendSecurityPinResetEmail(params: {
+    toEmail: string;
+    toName: string;
+    otp: string;
+  }): Promise<SendEmailResult> {
+    const { toEmail, toName, otp } = params;
+    const subject = '🔐 Reset Library Security PIN - LibSpace';
+    const htmlContent = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+        <div style="background: linear-gradient(135deg, #1e293b, #0f172a); padding: 24px; text-align: center; color: #ffffff;">
+          <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">LibSpace</h1>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #94a3b8;">Library Owner Master Security</p>
+        </div>
+        
+        <div style="padding: 28px 24px; color: #1e293b;">
+          <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #0f172a;">
+            Reset Your 6-Digit Library Access PIN
+          </h2>
+          
+          <p style="font-size: 14px; color: #64748b; line-height: 1.5; margin-bottom: 20px;">
+            Hello <strong>${toName || 'Library Owner'}</strong>,<br/>
+            You requested to reset your 6-digit security PIN for accessing your managed library workspaces on LibSpace. Use the verification code below:
+          </p>
+          
+          <div style="text-align: center; margin: 24px 0;">
+            <span style="display: inline-block; font-family: monospace; font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #0f172a; background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 12px 28px;">
+              ${otp}
+            </span>
+          </div>
+
+          <p style="font-size: 12px; color: #94a3b8; line-height: 1.4; margin-top: 24px;">
+            This PIN reset code is valid for <strong>10 minutes</strong>. If you did not initiate this request, please verify your master account credentials.
+          </p>
+        </div>
+        
+        <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+          © 2026 LibSpace Platform. Multi-Library Master Security.
+        </div>
+      </div>
+    `;
+
+    try {
+      console.log(`📨 [Brevo Email] Sending Security PIN Reset OTP ${otp} to ${toEmail}...`);
+      const res = await sendBrevoPost({
+        sender: { name: ENV.BREVO_SENDER_NAME, email: ENV.BREVO_SENDER_EMAIL },
+        to: [{ email: toEmail, name: toName || 'Library Owner' }],
+        subject,
+        htmlContent,
+      });
+
+      if (!res.ok) {
+        console.warn('⚠️ [Brevo Email] PIN reset email error:', res.data);
+        return { success: false, error: res.data?.message || 'Failed to dispatch PIN reset email' };
+      }
+
+      console.log(`✅ [Brevo Email] PIN reset OTP delivered to ${toEmail}! MessageId: ${res.data?.messageId}`);
+      return { success: true, messageId: res.data?.messageId };
+    } catch (err: any) {
+      console.error('❌ [Brevo Email] Failed to send PIN reset email:', err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
    * Notifies a student immediately upon successful seat booking confirmation.
    */
   static async sendBookingConfirmationStudentEmail(params: {

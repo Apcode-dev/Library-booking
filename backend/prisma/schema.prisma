@@ -26,6 +26,9 @@ model User {
   resetTokenExpiresAt DateTime?
   avatar       String?
   activeToken  String?    // Stores current active JWT session token to enforce single device login
+  securityPin  String?    // Hashed 6-digit PIN for Library Owner card access
+  pinResetOtp  String?    // Temporary 6-digit OTP for PIN reset
+  pinResetExpiresAt DateTime? // Validity window for PIN reset OTP
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -52,6 +55,7 @@ model EmailVerification {
 
 model Library {
   id              String      @id @default(uuid())
+  lid             String?     @unique // Unique readable Library ID e.g. "LID-101"
   name            String
   slug            String      @unique
   tagline         String?

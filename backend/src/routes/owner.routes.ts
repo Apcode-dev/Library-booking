@@ -24,4 +24,11 @@ router.post('/verify-qr', OwnerController.verifyQrCode);
 router.post('/check-in', OwnerController.checkInBooking);
 router.get('/students-and-attendance', OwnerController.getStudentsAndAttendance);
 
+// 6-Digit Security PIN & Library Lock Management
+router.get('/pin-status', OwnerController.getPinStatus);
+router.post('/security-pin/setup', OwnerController.setupSecurityPin);
+router.post('/security-pin/verify', OwnerController.verifySecurityPin);
+router.post('/security-pin/forgot', OwnerController.forgotSecurityPin);
+router.post('/security-pin/reset', OwnerController.resetSecurityPin);
+
 export default router;

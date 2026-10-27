@@ -11,6 +11,7 @@ export interface User {
 
 export interface Library {
   id: string;
+  lid?: string;
   name: string;
   slug: string;
   tagline?: string;

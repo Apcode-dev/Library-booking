@@ -1,13 +1,30 @@
 import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import prisma from '../config/prisma';
+import { EmailService } from '../services/email.service';
 
 export class OwnerController {
   /**
-   * Submit new library for Admin approval
+   * Submit new library for Admin approval (Max 5 libraries per Master Account)
    */
   static async createLibrary(req: Request, res: Response): Promise<void> {
     try {
       const ownerId = req.user!.id;
+
+      // STRICT LIMIT: Max 5 libraries per Owner Master Account
+      const existingCount = await prisma.library.count({ where: { ownerId } });
+      if (existingCount >= 5) {
+        res.status(400).json({
+          success: false,
+          message: 'Maximum limit reached: You can list a maximum of 5 libraries under your Master Account.',
+        });
+        return;
+      }
+
+      // Generate sequential LID (e.g. LID-102)
+      const allCount = await prisma.library.count();
+      const generatedLid = `LID-${100 + allCount + 1}`;
+
       const {
         name,
         tagline,
@@ -63,6 +80,7 @@ export class OwnerController {
 
       const library = await prisma.library.create({
         data: {
+          lid: generatedLid,
           name,
           slug,
           tagline: tagline || '',
@@ -488,11 +506,15 @@ export class OwnerController {
   static async getRevenueDashboard(req: Request, res: Response): Promise<void> {
     try {
       const ownerId = req.user!.id;
+      const { libraryId } = req.query;
 
-      // Find all libraries owned by this owner
+      // Find all libraries owned by this owner (or specific library if requested)
       const libraries = await prisma.library.findMany({
-        where: { ownerId },
-        select: { id: true, name: true, totalSeats: true },
+        where: {
+          ownerId,
+          ...(libraryId && typeof libraryId === 'string' ? { id: libraryId } : {}),
+        },
+        select: { id: true, name: true, totalSeats: true, lid: true },
       });
 
       const libraryIds = libraries.map((l) => l.id);
@@ -789,10 +811,14 @@ export class OwnerController {
   static async getStudentsAndAttendance(req: Request, res: Response): Promise<void> {
     try {
       const ownerId = req.user!.id;
+      const { libraryId } = req.query;
 
-      // Find all libraries owned by this owner
+      // Find all libraries owned by this owner (or specific library)
       const libraries = await prisma.library.findMany({
-        where: { ownerId },
+        where: {
+          ownerId,
+          ...(libraryId && typeof libraryId === 'string' ? { id: libraryId } : {}),
+        },
         select: { id: true, name: true },
       });
       const libraryIds = libraries.map((l) => l.id);
@@ -857,6 +883,196 @@ export class OwnerController {
         message: 'Failed to fetch student and attendance records',
         error: error.message,
       });
+    }
+  }
+
+  /**
+   * Check if the Library Owner has set up their 6-digit security PIN
+   */
+  static async getPinStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const ownerId = req.user!.id;
+      const user = await prisma.user.findUnique({
+        where: { id: ownerId },
+        select: { securityPin: true },
+      });
+
+      res.json({
+        success: true,
+        hasPin: !!user?.securityPin,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to check PIN status', error: error.message });
+    }
+  }
+
+  /**
+   * Set up or update the 6-digit security PIN for the Library Owner
+   */
+  static async setupSecurityPin(req: Request, res: Response): Promise<void> {
+    try {
+      const ownerId = req.user!.id;
+      const { pin } = req.body;
+
+      if (!pin || typeof pin !== 'string' || !/^\d{6}$/.test(pin.trim())) {
+        res.status(400).json({ success: false, message: 'PIN must be exactly 6 numeric digits.' });
+        return;
+      }
+
+      const hashedPin = await bcrypt.hash(pin.trim(), 10);
+      await prisma.user.update({
+        where: { id: ownerId },
+        data: { securityPin: hashedPin },
+      });
+
+      res.json({
+        success: true,
+        message: '6-digit Security PIN created successfully! You can now unlock your libraries.',
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to set security PIN', error: error.message });
+    }
+  }
+
+  /**
+   * Verify 6-digit security PIN to unlock a library card
+   */
+  static async verifySecurityPin(req: Request, res: Response): Promise<void> {
+    try {
+      const ownerId = req.user!.id;
+      const { pin } = req.body;
+
+      if (!pin || typeof pin !== 'string') {
+        res.status(400).json({ success: false, verified: false, message: 'Please enter your 6-digit PIN.' });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: ownerId },
+        select: { securityPin: true },
+      });
+
+      if (!user?.securityPin) {
+        res.status(400).json({
+          success: false,
+          verified: false,
+          requiresSetup: true,
+          message: 'Security PIN has not been set yet. Please create your 6-digit PIN.',
+        });
+        return;
+      }
+
+      const isMatch = await bcrypt.compare(pin.trim(), user.securityPin);
+      if (!isMatch) {
+        res.status(401).json({
+          success: false,
+          verified: false,
+          message: 'Incorrect PIN. Please enter the correct 6-digit security PIN.',
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        verified: true,
+        message: 'Security PIN verified successfully!',
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, verified: false, message: 'Verification failed', error: error.message });
+    }
+  }
+
+  /**
+   * Forgot Security PIN - Dispatches 6-digit OTP to owner's registered email via Brevo
+   */
+  static async forgotSecurityPin(req: Request, res: Response): Promise<void> {
+    try {
+      const ownerId = req.user!.id;
+      const user = await prisma.user.findUnique({
+        where: { id: ownerId },
+        select: { id: true, email: true, name: true },
+      });
+
+      if (!user) {
+        res.status(404).json({ success: false, message: 'Owner account not found.' });
+        return;
+      }
+
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      await prisma.user.update({
+        where: { id: ownerId },
+        data: {
+          pinResetOtp: otp,
+          pinResetExpiresAt: expiresAt,
+        },
+      });
+
+      await EmailService.sendSecurityPinResetEmail({
+        toEmail: user.email,
+        toName: user.name,
+        otp,
+      });
+
+      res.json({
+        success: true,
+        message: `A 6-digit verification code has been dispatched to ${user.email}. Please check your inbox.`,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to dispatch PIN reset OTP', error: error.message });
+    }
+  }
+
+  /**
+   * Reset Security PIN with Email OTP
+   */
+  static async resetSecurityPin(req: Request, res: Response): Promise<void> {
+    try {
+      const ownerId = req.user!.id;
+      const { otp, newPin } = req.body;
+
+      if (!otp || !newPin) {
+        res.status(400).json({ success: false, message: 'OTP and new 6-digit PIN are required.' });
+        return;
+      }
+
+      if (!/^\d{6}$/.test(newPin.trim())) {
+        res.status(400).json({ success: false, message: 'New PIN must be exactly 6 numeric digits.' });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: ownerId },
+        select: { pinResetOtp: true, pinResetExpiresAt: true },
+      });
+
+      if (!user || !user.pinResetOtp || user.pinResetOtp !== otp.trim()) {
+        res.status(400).json({ success: false, message: 'Invalid verification code. Please check your email.' });
+        return;
+      }
+
+      if (user.pinResetExpiresAt && user.pinResetExpiresAt < new Date()) {
+        res.status(400).json({ success: false, message: 'Verification code has expired. Please request a new one.' });
+        return;
+      }
+
+      const hashedPin = await bcrypt.hash(newPin.trim(), 10);
+      await prisma.user.update({
+        where: { id: ownerId },
+        data: {
+          securityPin: hashedPin,
+          pinResetOtp: null,
+          pinResetExpiresAt: null,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: 'Security PIN reset successfully! You can now unlock your libraries with your new PIN.',
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to reset PIN', error: error.message });
     }
   }
 }

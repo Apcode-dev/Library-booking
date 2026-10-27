@@ -63,6 +63,7 @@ async function main() {
   console.log('📚 Creating sample libraries with seats and zones...');
   const rajaLibrary = await prisma.library.create({
     data: {
+      lid: 'LID-101',
       name: 'Raja Library',
       slug: 'raja-library-0808',
       tagline: 'Quiet & Focus-Friendly Study Environment',
