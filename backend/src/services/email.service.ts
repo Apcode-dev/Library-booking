@@ -163,6 +163,184 @@ export class EmailService {
   }
 
   /**
+   * Notifies a student immediately upon successful seat booking confirmation.
+   */
+  static async sendBookingConfirmationStudentEmail(params: {
+    toEmail: string;
+    toName: string;
+    libraryName: string;
+    seatNumber: string;
+    bookingCode: string;
+    bookingType: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    validUntil?: string | null;
+    totalAmount: number;
+  }): Promise<void> {
+    const { toEmail, toName, libraryName, seatNumber, bookingCode, bookingType, date, startTime, endTime, validUntil, totalAmount } = params;
+
+    const slotDisplay = validUntil
+      ? `Valid until ${validUntil} (${bookingType} Pass)`
+      : `${date} from ${startTime} to ${endTime}`;
+
+    const htmlContent = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+        <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 24px; text-align: center; color: #ffffff;">
+          <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">LibSpace</h1>
+          <p style="margin: 4px 0 0 0; font-size: 13px; color: #d1fae5;">🎉 Booking Confirmed!</p>
+        </div>
+        
+        <div style="padding: 24px; color: #1e293b;">
+          <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #065f46;">
+            Your Seat is Reserved!
+          </h2>
+          
+          <p style="font-size: 14px; color: #475569; line-height: 1.5; margin-bottom: 20px;">
+            Hello <strong>${toName}</strong>,<br/>
+            Your seat reservation at <strong>${libraryName}</strong> has been successfully confirmed.
+          </p>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin: 18px 0;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+              <span style="color: #64748b;">Booking Pass Code:</span>
+              <strong style="font-family: monospace; color: #059669; font-size: 15px;">${bookingCode}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+              <span style="color: #64748b;">Reserved Desk:</span>
+              <strong style="color: #0f172a;">Desk ${seatNumber}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+              <span style="color: #64748b;">Pass Type:</span>
+              <strong style="color: #0f172a;">${bookingType}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+              <span style="color: #64748b;">Schedule:</span>
+              <strong style="color: #0f172a;">${slotDisplay}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px dashed #cbd5e1; padding-top: 10px; font-size: 15px; font-weight: bold;">
+              <span style="color: #1e293b;">Total Paid:</span>
+              <span style="color: #059669;">₹${totalAmount.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px; font-size: 13px; color: #1e40af; line-height: 1.4;">
+            📲 <strong>Check-in Requirement:</strong> Please scan your Digital QR Pass at the library front desk upon arrival to record your attendance.
+          </div>
+        </div>
+
+        <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+          © 2026 LibSpace Platform. Powered by Brevo Transactional Email API.
+        </div>
+      </div>
+    `;
+
+    try {
+      console.log(`📨 [Brevo Email] Sending Booking Confirmation to student ${toEmail} for ${bookingCode}...`);
+      const res = await sendBrevoPost({
+        sender: { name: ENV.BREVO_SENDER_NAME, email: ENV.BREVO_SENDER_EMAIL },
+        to: [{ email: toEmail, name: toName }],
+        subject: `🎉 Booking Confirmed: Desk ${seatNumber} at ${libraryName} (${bookingCode})`,
+        htmlContent,
+      });
+      if (res.ok) {
+        console.log(`✅ [Brevo Email] Booking confirmation delivered to student ${toEmail}! MessageId: ${res.data?.messageId}`);
+      } else {
+        console.warn(`⚠️ [Brevo Email] Failed to send booking confirmation to ${toEmail}:`, res.data);
+      }
+    } catch (err: any) {
+      console.error(`❌ [Brevo Email] Error dispatching booking email to ${toEmail}:`, err.message);
+    }
+  }
+
+  /**
+   * Notifies a library owner immediately when a student books a desk.
+   */
+  static async sendBookingConfirmationOwnerEmail(params: {
+    toEmail: string;
+    toName: string;
+    studentName: string;
+    libraryName: string;
+    seatNumber: string;
+    bookingCode: string;
+    bookingType: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    totalAmount: number;
+  }): Promise<void> {
+    const { toEmail, toName, studentName, libraryName, seatNumber, bookingCode, bookingType, date, startTime, endTime, totalAmount } = params;
+
+    const htmlContent = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+        <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); padding: 24px; text-align: center; color: #ffffff;">
+          <h1 style="margin: 0; font-size: 22px; font-weight: 800;">LibSpace Owner Alert</h1>
+          <p style="margin: 4px 0 0 0; font-size: 13px; color: #bfdbfe;">📥 New Student Booking Received</p>
+        </div>
+        
+        <div style="padding: 24px; color: #1e293b;">
+          <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #1e3a8a;">
+            Desk ${seatNumber} Booked
+          </h2>
+          
+          <p style="font-size: 14px; color: #475569; line-height: 1.5; margin-bottom: 20px;">
+            Dear <strong>${toName}</strong>,<br/>
+            Student <strong>${studentName}</strong> has just booked a desk at your library (<strong>${libraryName}</strong>).
+          </p>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin: 18px 0;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+              <span style="color: #64748b;">Booking Pass Code:</span>
+              <strong style="font-family: monospace; color: #2563eb; font-size: 15px;">${bookingCode}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+              <span style="color: #64748b;">Student:</span>
+              <strong style="color: #0f172a;">${studentName}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+              <span style="color: #64748b;">Desk / Seat:</span>
+              <strong style="color: #0f172a;">Desk ${seatNumber}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+              <span style="color: #64748b;">Pass Type:</span>
+              <strong style="color: #0f172a;">${bookingType}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
+              <span style="color: #64748b;">Schedule:</span>
+              <strong style="color: #0f172a;">${date} (${startTime} - ${endTime})</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px dashed #cbd5e1; padding-top: 10px; font-size: 15px; font-weight: bold;">
+              <span style="color: #1e293b;">Booking Revenue:</span>
+              <span style="color: #16a34a;">₹${totalAmount.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8;">
+          © 2026 LibSpace Platform. Real-Time Automation Service.
+        </div>
+      </div>
+    `;
+
+    try {
+      console.log(`📨 [Brevo Email] Sending Booking Alert to library owner ${toEmail} for ${bookingCode}...`);
+      const res = await sendBrevoPost({
+        sender: { name: ENV.BREVO_SENDER_NAME, email: ENV.BREVO_SENDER_EMAIL },
+        to: [{ email: toEmail, name: toName }],
+        subject: `📥 New Booking Alert: Desk ${seatNumber} at ${libraryName} (${bookingCode})`,
+        htmlContent,
+      });
+      if (res.ok) {
+        console.log(`✅ [Brevo Email] Booking alert delivered to owner ${toEmail}! MessageId: ${res.data?.messageId}`);
+      } else {
+        console.warn(`⚠️ [Brevo Email] Failed to send booking alert to owner ${toEmail}:`, res.data);
+      }
+    } catch (err: any) {
+      console.error(`❌ [Brevo Email] Error dispatching booking alert to owner ${toEmail}:`, err.message);
+    }
+  }
+
+  /**
    * Notifies a Library Owner when their account has been approved by the Admin.
    */
   static async sendOwnerApprovalEmail(toEmail: string, toName: string): Promise<void> {
@@ -221,13 +399,21 @@ export class EmailService {
     `;
 
     try {
-      await sendBrevoPost({
+      console.log(`📨 [Brevo Email] Sending Session Complete Notice to student ${toEmail} for Desk ${seatNumber}...`);
+      const res = await sendBrevoPost({
         sender: { name: ENV.BREVO_SENDER_NAME, email: ENV.BREVO_SENDER_EMAIL },
         to: [{ email: toEmail, name: toName }],
         subject: `⏰ Booking Completed - Desk ${seatNumber} at ${libraryName}`,
         htmlContent,
       });
-    } catch (_) {}
+      if (res.ok) {
+        console.log(`✅ [Brevo Email] Session complete email delivered to student ${toEmail}! MessageId: ${res.data?.messageId}`);
+      } else {
+        console.warn(`⚠️ [Brevo Email] Failed session complete email to ${toEmail}:`, res.data);
+      }
+    } catch (err: any) {
+      console.error(`❌ [Brevo Email] Error dispatching session complete to ${toEmail}:`, err.message);
+    }
   }
 
   /**
@@ -261,13 +447,21 @@ export class EmailService {
     `;
 
     try {
-      await sendBrevoPost({
+      console.log(`📨 [Brevo Email] Sending Desk Completion Notice to owner ${toEmail} for Desk ${seatNumber}...`);
+      const res = await sendBrevoPost({
         sender: { name: ENV.BREVO_SENDER_NAME, email: ENV.BREVO_SENDER_EMAIL },
         to: [{ email: toEmail, name: toName }],
         subject: `⏰ Desk ${seatNumber} Session Completed - ${libraryName}`,
         htmlContent,
       });
-    } catch (_) {}
+      if (res.ok) {
+        console.log(`✅ [Brevo Email] Desk completion notice delivered to owner ${toEmail}! MessageId: ${res.data?.messageId}`);
+      } else {
+        console.warn(`⚠️ [Brevo Email] Failed desk completion notice to owner ${toEmail}:`, res.data);
+      }
+    } catch (err: any) {
+      console.error(`❌ [Brevo Email] Error dispatching desk completion notice to owner ${toEmail}:`, err.message);
+    }
   }
 
   /**

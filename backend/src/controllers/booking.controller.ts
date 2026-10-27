@@ -194,11 +194,47 @@ export class BookingController {
       const fullBooking = await prisma.booking.findUnique({
         where: { id: booking.id },
         include: {
-          library: true,
+          user: true,
+          library: { include: { owner: true } },
           seat: { include: { seatZone: true } },
           payment: true,
         },
       });
+
+      // Dispatch Real-time Booking Confirmation Emails (Non-blocking async)
+      if (fullBooking) {
+        if (fullBooking.user?.email) {
+          EmailService.sendBookingConfirmationStudentEmail({
+            toEmail: fullBooking.user.email,
+            toName: fullBooking.user.name,
+            libraryName: fullBooking.library.name,
+            seatNumber: fullBooking.seat.seatNumber,
+            bookingCode: fullBooking.bookingCode,
+            bookingType: fullBooking.bookingType,
+            date: fullBooking.date,
+            startTime: fullBooking.startTime,
+            endTime: fullBooking.endTime,
+            validUntil: fullBooking.validUntil ? fullBooking.validUntil.toISOString().split('T')[0] : null,
+            totalAmount: fullBooking.totalAmount,
+          }).catch((e) => console.error('Failed to send student booking email:', e));
+        }
+
+        if (fullBooking.library?.owner?.email) {
+          EmailService.sendBookingConfirmationOwnerEmail({
+            toEmail: fullBooking.library.owner.email,
+            toName: fullBooking.library.owner.name,
+            studentName: fullBooking.user.name,
+            libraryName: fullBooking.library.name,
+            seatNumber: fullBooking.seat.seatNumber,
+            bookingCode: fullBooking.bookingCode,
+            bookingType: fullBooking.bookingType,
+            date: fullBooking.date,
+            startTime: fullBooking.startTime,
+            endTime: fullBooking.endTime,
+            totalAmount: fullBooking.totalAmount,
+          }).catch((e) => console.error('Failed to send owner booking email:', e));
+        }
+      }
 
       res.status(201).json({
         success: true,
