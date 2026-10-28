@@ -13,13 +13,11 @@ import {
   AlertCircle,
   Clock,
   ArrowRight,
-  BookOpen,
-  Sparkles,
   Shield,
-  Zap,
   Check,
   KeyRound,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -48,7 +46,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     resetPassword,
   } = useAuth();
 
-  // Role is locked strictly to defaultRole (no switching tabs inside the modal)
+  // Role is locked strictly to defaultRole (no switching tabs inside modal)
   const [targetRole, setTargetRole] = useState<UserRole>(defaultRole);
   const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
 
@@ -77,7 +75,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [ownerPendingNotice, setOwnerPendingNotice] = useState<boolean>(false);
   const [registrationCompleteNotice, setRegistrationCompleteNotice] = useState<boolean>(false);
 
-  // Countdown interval effect for Resend OTP
+  // Countdown timer for Resend OTP
   useEffect(() => {
     let timer: any;
     if (otpCountdown > 0) {
@@ -294,205 +292,152 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // Config mapping for each role
+  // Role metadata configurations
   const roleConfig = {
     USER: {
-      badge: 'STUDENT PORTAL',
-      badgeClass: 'bg-blue-400/20 text-blue-100 border border-blue-300/30',
-      title: 'Your Dedicated Study Sanctuary',
-      subtitle: 'Book silent study desks, reserve guaranteed air-conditioned spaces, and enjoy 5-minute transactional hold protection.',
-      gradient: 'from-blue-700 via-indigo-700 to-slate-900',
-      accentColor: 'blue',
-      glowColor: 'bg-blue-500/20',
-      icon: BookOpen,
-      iconBg: 'bg-blue-500/30 text-blue-200 border border-blue-400/30',
+      badge: '🎓 Student Portal',
+      badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
+      desktopGradient: 'from-blue-700 via-indigo-800 to-slate-900',
+      desktopTitle: 'Your Study Sanctuary',
+      desktopSubtitle: 'Book silent study desks with guaranteed Wi-Fi, AC, and 5-minute hold protection.',
       features: [
-        { title: 'Instant Desk Booking', desc: 'Reserve guaranteed quiet study desks by the hour or full day' },
-        { title: '5-Min Hold Engine', desc: 'Protected checkout timer so you never lose your selected seat' },
-        { title: 'Pincode Verified', desc: 'Fast neighborhood search across 6 major regions' },
-        { title: 'Digital QR Passes', desc: 'Contactless instant check-in at any partner library' },
+        'Instant Desk Booking by the hour or day',
+        '5-Minute Hold Protection Engine',
+        'Pincode-Verified Study Halls',
+        'Digital QR Code Entry Passes',
       ],
-      trustText: 'Verified Students & Aspirants',
       buttonBg: 'bg-blue-600 hover:bg-blue-700 text-white',
+      roleTitle: 'Student',
     },
     OWNER: {
-      badge: 'PARTNER ECOSYSTEM',
-      badgeClass: 'bg-amber-400/20 text-amber-100 border border-amber-300/30',
-      title: 'Grow & Monetize Your Study Spaces',
-      subtitle: 'List up to 5 library branches, manage hourly rates, track live occupancy on visual seat maps, and protect each branch with a 6-digit master PIN.',
-      gradient: 'from-amber-600 via-orange-600 to-slate-950',
-      accentColor: 'amber',
-      glowColor: 'bg-amber-500/20',
-      icon: Building2,
-      iconBg: 'bg-amber-500/30 text-amber-200 border border-amber-400/30',
+      badge: '🏢 Library Partner',
+      badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+      desktopGradient: 'from-amber-600 via-orange-700 to-slate-950',
+      desktopTitle: 'Monetize Study Spaces',
+      desktopSubtitle: 'List up to 5 library branches, manage hourly rates, and track live occupancy.',
       features: [
-        { title: 'Up to 5 Branches', desc: 'Add and manage multiple library spaces under one master account' },
-        { title: '6-Digit PIN Security', desc: 'Independent PIN lock per library with OTP email reset recovery' },
-        { title: 'Visual Seat Map', desc: 'Configure interactive desk grids & dynamic hourly rates' },
-        { title: 'Branch Analytics', desc: 'Real-time revenue, occupancy rates & booking breakdown' },
+        'Multi-Branch Management (Up to 5 Libraries)',
+        '6-Digit Security PIN per Library Branch',
+        'Interactive Visual Seat Map & Layouts',
+        'Real-time Revenue & Booking Analytics',
       ],
-      trustText: 'Verified Library Partners',
       buttonBg: 'bg-amber-600 hover:bg-amber-700 text-white',
+      roleTitle: 'Library Owner',
     },
     ADMIN: {
-      badge: 'PLATFORM GOVERNANCE',
-      badgeClass: 'bg-purple-400/20 text-purple-100 border border-purple-300/30',
-      title: 'Platform Administration & Oversight',
-      subtitle: 'Centralized state-wise management, sub-admin delegation, owner verification pipelines, and platform-wide revenue audits.',
-      gradient: 'from-purple-800 via-indigo-900 to-slate-950',
-      accentColor: 'purple',
-      glowColor: 'bg-purple-500/20',
-      icon: ShieldCheck,
-      iconBg: 'bg-purple-500/30 text-purple-200 border border-purple-400/30',
+      badge: '🛡️ Platform Admin',
+      badgeClass: 'bg-purple-50 text-purple-800 border-purple-200',
+      desktopGradient: 'from-purple-800 via-indigo-900 to-slate-950',
+      desktopTitle: 'Platform Oversight',
+      desktopSubtitle: 'Centralized state-wise management, sub-admin delegation, and revenue audits.',
       features: [
-        { title: 'State-Wise Delegation', desc: 'Assign sub-admins to supervise specific states & territories' },
-        { title: 'Library Verification', desc: 'Review, approve, or escalate new library listing requests' },
-        { title: 'Account Governance', desc: 'Full user & owner management with audit trails & status control' },
-        { title: 'Revenue Auditing', desc: 'Track platform-wide revenue and state-wise performance' },
+        'State-Wise Sub-Admin Delegation',
+        'Library Verification & Escalations',
+        'Full User & Owner Account Audits',
+        'Financial Auditing & Platform Metrics',
       ],
-      trustText: 'Enterprise Admin Security',
       buttonBg: 'bg-purple-700 hover:bg-purple-800 text-white',
+      roleTitle: 'Administrator',
     },
   };
 
   const currentConfig = roleConfig[targetRole] || roleConfig.USER;
-  const PortalIcon = currentConfig.icon;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-950/75 backdrop-blur-md overflow-y-auto animate-fadeIn text-slate-900">
-      {/* Wide 2-Column Responsive Modal */}
-      <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200 my-auto grid grid-cols-1 md:grid-cols-12 max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/75 backdrop-blur-sm overflow-y-auto animate-fadeIn text-slate-900">
+      {/* Responsive Card Container: On mobile it is compact and direct; on desktop it shows a 2-column layout */}
+      <div className="relative w-full max-w-md md:max-w-4xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col md:grid md:grid-cols-12 max-h-[92dvh] sm:max-h-[90vh]">
 
         {/* ======================================================== */}
-        {/* LEFT COLUMN: BRANDING, ROLE INFO & VALUE PROPOSITION */}
+        {/* DESKTOP-ONLY SIDEBAR (Hidden on mobile to save 100% space) */}
         {/* ======================================================== */}
         <div
-          className={`md:col-span-5 p-6 sm:p-8 text-white flex flex-col justify-between relative overflow-hidden bg-gradient-to-br ${currentConfig.gradient}`}
+          className={`hidden md:flex md:col-span-5 p-6 sm:p-8 text-white flex-col justify-between relative overflow-hidden bg-gradient-to-br ${currentConfig.desktopGradient}`}
         >
-          {/* Subtle Ambient Glows */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-10 -left-10 w-64 h-64 bg-black/20 rounded-full blur-3xl pointer-events-none" />
+          {/* Subtle Ambient Glow */}
+          <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
-          {/* Top: Logo & Role Badge */}
           <div className="relative z-10 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center justify-center text-white shadow-inner font-black text-sm tracking-tight">
-                  <BookOpen className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <span className="text-base font-black tracking-tight text-white block leading-none">
-                    Lib<span className="text-amber-300">Space</span>
-                  </span>
-                  <span className="text-[10px] text-white/70 font-semibold tracking-wider uppercase block mt-0.5">
-                    Private Study Network
-                  </span>
-                </div>
-              </div>
-
-              <span
-                className={`text-[9px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full backdrop-blur-md ${currentConfig.badgeClass}`}
-              >
-                {currentConfig.badge}
-              </span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-white/15 border border-white/20 text-white backdrop-blur-sm">
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>{currentConfig.badge}</span>
             </div>
 
-            {/* Portal Title & Headline */}
-            <div className="pt-2">
-              <div className="inline-flex p-2.5 rounded-2xl mb-3 shadow-inner bg-white/15 border border-white/20">
-                <PortalIcon className="w-6 h-6 text-white" />
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug">
-                {currentConfig.title}
+            <div>
+              <h2 className="text-xl font-black text-white tracking-tight leading-tight">
+                {currentConfig.desktopTitle}
               </h2>
-              <p className="text-xs text-white/80 mt-2 leading-relaxed">
-                {currentConfig.subtitle}
+              <p className="text-xs text-white/80 mt-1.5 leading-relaxed">
+                {currentConfig.desktopSubtitle}
               </p>
             </div>
 
-            {/* Role Features List (Hidden on very tiny mobile, visible sm+) */}
-            <div className="hidden sm:flex flex-col gap-2.5 pt-3">
-              {currentConfig.features.map((item, idx) => (
+            <div className="space-y-2 pt-2">
+              {currentConfig.features.map((feat, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-2.5 bg-white/10 hover:bg-white/15 p-2.5 rounded-xl border border-white/15 backdrop-blur-sm transition"
+                  className="flex items-center gap-2 bg-white/10 p-2 rounded-xl border border-white/10 text-xs text-white/90"
                 >
-                  <div className="w-5 h-5 rounded-lg bg-emerald-400/20 text-emerald-300 flex items-center justify-center flex-shrink-0 mt-0.5 border border-emerald-400/30">
-                    <Check className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white tracking-tight">
-                      {item.title}
-                    </h4>
-                    <p className="text-[11px] text-white/70 leading-tight mt-0.5">
-                      {item.desc}
-                    </p>
-                  </div>
+                  <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                  <span className="font-medium text-[11px] leading-tight">{feat}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Bottom Security / Trust Notice */}
-          <div className="relative z-10 pt-4 mt-4 border-t border-white/15 flex items-center justify-between text-[11px] text-white/75">
-            <div className="flex items-center gap-1.5 font-medium">
-              <Shield className="w-3.5 h-3.5 text-emerald-300" />
+          <div className="relative z-10 pt-4 border-t border-white/15 flex items-center justify-between text-[11px] text-white/70">
+            <div className="flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5 text-emerald-400" />
               <span>256-Bit SSL Encrypted</span>
             </div>
-            <span className="text-[10px] text-white/60 font-semibold">
-              {currentConfig.trustText}
-            </span>
+            <span>LibSpace Network</span>
           </div>
         </div>
 
         {/* ======================================================== */}
-        {/* RIGHT COLUMN: AUTHENTICATION FORMS & ACTIONS */}
+        {/* MAIN FORM COLUMN (100% width on mobile, 7/12 on desktop) */}
         {/* ======================================================== */}
-        <div className="md:col-span-7 flex flex-col justify-between bg-white overflow-y-auto max-h-[92vh]">
-          {/* Header Bar */}
-          <div className="p-6 sm:p-7 pb-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                  {targetRole === 'USER'
-                    ? 'Student Access'
-                    : targetRole === 'OWNER'
-                    ? 'Library Partner Access'
-                    : 'System Administrator'}
-                </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-              </div>
-              <h3 className="text-lg font-black text-slate-900 tracking-tight mt-0.5">
+        <div className="w-full md:col-span-7 flex flex-col justify-between bg-white overflow-hidden max-h-[92dvh] sm:max-h-[90vh]">
+
+          {/* Clean Top Header (Role badge + Title + Close Button) */}
+          <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-lg border ${currentConfig.badgeClass}`}
+              >
+                {currentConfig.badge}
+              </span>
+              <span className="text-xs sm:text-sm font-black text-slate-800">
                 {authMode === 'login'
-                  ? `Sign In to ${targetRole === 'USER' ? 'LibSpace' : targetRole === 'OWNER' ? 'Partner Portal' : 'Admin Console'}`
+                  ? 'Sign In'
                   : authMode === 'register'
-                  ? `Create ${targetRole === 'USER' ? 'Student' : 'Owner'} Account`
-                  : 'Reset Account Password'}
-              </h3>
+                  ? 'Create Account'
+                  : 'Password Reset'}
+              </span>
             </div>
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer"
               title="Close"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
 
-          {/* Mode Switcher Pills (Sign In vs Register - Hidden for Admin) */}
+          {/* Segmented Mode Switcher: Sign In vs Create Account (Hidden for Admin & Forgot Pass) */}
           {targetRole !== 'ADMIN' && authMode !== 'forgot_password' && (
-            <div className="px-6 sm:px-7 pt-4">
-              <div className="bg-slate-100 p-1 rounded-2xl flex gap-1 border border-slate-200 text-xs font-bold text-slate-600">
+            <div className="px-4 pt-3 sm:px-6 sm:pt-4 flex-shrink-0">
+              <div className="bg-slate-100 p-1 rounded-xl flex gap-1 border border-slate-200/80 text-xs font-bold text-slate-600">
                 <button
                   type="button"
                   onClick={() => {
                     setAuthMode('login');
                     resetState();
                   }}
-                  className={`flex-1 py-2 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 py-1.5 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     authMode === 'login'
-                      ? 'bg-white text-slate-900 shadow-sm font-extrabold border border-slate-200/60'
+                      ? 'bg-white text-slate-900 shadow-sm font-extrabold'
                       : 'hover:text-slate-900 text-slate-500'
                   }`}
                 >
@@ -505,89 +450,82 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     setAuthMode('register');
                     resetState();
                   }}
-                  className={`flex-1 py-2 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 py-1.5 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     authMode === 'register'
-                      ? 'bg-white text-slate-900 shadow-sm font-extrabold border border-slate-200/60'
+                      ? 'bg-white text-slate-900 shadow-sm font-extrabold'
                       : 'hover:text-slate-900 text-slate-500'
                   }`}
                 >
                   <UserIcon className="w-3.5 h-3.5" />
-                  <span>Create Account</span>
+                  <span>Register</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Admin Fixed Mode Indicator */}
+          {/* Admin Notice */}
           {targetRole === 'ADMIN' && (
-            <div className="px-6 sm:px-7 pt-4">
-              <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-xs font-semibold flex items-center gap-2">
+            <div className="px-4 pt-3 sm:px-6 sm:pt-4 flex-shrink-0">
+              <div className="p-2 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-[11px] font-medium flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-purple-600 flex-shrink-0" />
                 <span>
-                  Admin authentication is strictly secured. Sub-admins must use credentials issued by Master Admin.
+                  Admin console requires verified credentials issued by Master Admin.
                 </span>
               </div>
             </div>
           )}
 
-          {/* Form Area with Scrolling */}
-          <div className="p-6 sm:p-7 space-y-4 flex-1">
+          {/* Scrollable Form Body */}
+          <div className="p-4 sm:p-6 space-y-3.5 overflow-y-auto flex-1">
 
-            {/* 1. Owner Registration Submitted Success Screen */}
+            {/* 1. Registration Submitted Notice for Owner */}
             {registrationCompleteNotice && (
-              <div className="p-6 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-3xl text-center space-y-3 animate-fadeIn">
-                <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-inner">
-                  <Clock className="w-7 h-7 animate-pulse" />
+              <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl text-center space-y-2 animate-fadeIn">
+                <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-inner">
+                  <Clock className="w-5 h-5 animate-pulse" />
                 </div>
-                <h3 className="text-base font-black text-amber-900 tracking-tight">
-                  Owner Registration Submitted!
+                <h3 className="text-sm font-bold text-amber-900">
+                  Owner Application Submitted
                 </h3>
-                <p className="text-xs text-amber-800 leading-relaxed max-w-sm mx-auto">
-                  Your Library Owner account has been created and securely forwarded to the <strong>Platform Administrator</strong> for approval.
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Your Library Owner account has been created and sent to the <strong>Platform Admin</strong> for approval.
                 </p>
-                <div className="bg-white/80 p-3 rounded-2xl border border-amber-200 text-xs text-amber-700 font-medium">
-                  🛡️ You will be able to log in to your Owner Dashboard as soon as the Admin approves your request.
-                </div>
                 <button
                   type="button"
                   onClick={() => {
                     setRegistrationCompleteNotice(false);
                     setAuthMode('login');
                   }}
-                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer"
+                  className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer"
                 >
-                  Back to Sign In
+                  Go to Sign In
                 </button>
               </div>
             )}
 
             {/* 2. Owner Pending Notice (When unapproved owner tries to log in) */}
             {ownerPendingNotice && !registrationCompleteNotice && (
-              <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 space-y-2 text-xs">
-                <div className="flex items-center gap-2 font-bold text-amber-800">
-                  <Clock className="w-4 h-4 text-amber-600" />
-                  <span>Account Awaiting Admin Approval</span>
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 space-y-1 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                  <Clock className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <span>Awaiting Admin Approval</span>
                 </div>
-                <p className="text-xs leading-relaxed">
-                  As an enterprise security policy, all Library Owner accounts require Platform Admin approval before dashboard access is granted.
+                <p className="text-[11px] leading-relaxed">
+                  Your Library Owner account is under verification. You will be able to log in once approved.
                 </p>
-                <div className="pt-1 text-[11px] text-amber-700 font-medium">
-                  Please wait for the administrator to review and activate your account.
-                </div>
               </div>
             )}
 
-            {/* Success Notification */}
+            {/* Alerts */}
             {successMessage && !registrationCompleteNotice && (
-              <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-2">
+              <div className="p-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                 <span>{successMessage}</span>
               </div>
             )}
 
-            {/* Error Notification */}
             {error && !registrationCompleteNotice && (
-              <div className="p-3 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-medium flex items-center gap-2">
+              <div className="p-2.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-medium flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0" />
                 <span>{error}</span>
               </div>
@@ -597,13 +535,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {/* 1. SIGN IN FORM */}
             {/* ======================================================== */}
             {authMode === 'login' && !registrationCompleteNotice && (
-              <form onSubmit={handlePasswordLogin} className="space-y-4">
+              <form onSubmit={handlePasswordLogin} className="space-y-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
                     Email Address
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
                     <input
                       type="email"
                       required
@@ -616,13 +554,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           ? 'owner@studyhub.com'
                           : 'student@example.com'
                       }
-                      className="w-full pl-10 pr-3.5 py-3 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 font-medium transition"
+                      className="w-full pl-9 pr-3 py-2 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 font-medium transition"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex justify-between items-center mb-1">
                     <label className="text-xs font-bold text-slate-800">Password</label>
                     <button
                       type="button"
@@ -630,53 +568,53 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         setAuthMode('forgot_password');
                         resetState();
                       }}
-                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold hover:underline cursor-pointer"
+                      className="text-[11px] text-blue-600 hover:text-blue-700 font-semibold hover:underline cursor-pointer"
                     >
-                      Forgot Password?
+                      Forgot?
                     </button>
                   </div>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
                     <input
                       type="password"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full pl-10 pr-3.5 py-3 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 font-medium transition"
+                      className="w-full pl-9 pr-3 py-2 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 font-medium transition"
                     />
                   </div>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-1">
                   <button
                     type="submit"
                     disabled={loading}
-                    className={`w-full py-3 rounded-2xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer ${currentConfig.buttonBg}`}
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs shadow transition flex items-center justify-center gap-2 cursor-pointer ${currentConfig.buttonBg}`}
                   >
                     {loading ? (
-                      'Authenticating...'
+                      'Signing In...'
                     ) : (
                       <>
-                        <span>Sign In as {targetRole === 'USER' ? 'Student' : targetRole === 'OWNER' ? 'Library Owner' : 'Administrator'}</span>
-                        <ArrowRight className="w-4 h-4" />
+                        <span>Sign In as {currentConfig.roleTitle}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </>
                     )}
                   </button>
                 </div>
 
                 {targetRole !== 'ADMIN' && (
-                  <div className="text-center pt-2">
-                    <span className="text-xs text-slate-500">Don't have an account yet? </span>
+                  <div className="text-center pt-1">
+                    <span className="text-[11px] text-slate-500">Need an account? </span>
                     <button
                       type="button"
                       onClick={() => {
                         setAuthMode('register');
                         resetState();
                       }}
-                      className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                      className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
                     >
-                      Create one now
+                      Register here
                     </button>
                   </div>
                 )}
@@ -687,42 +625,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {/* 2. REGISTER NEW ACCOUNT (With Email OTP + Green Tick) */}
             {/* ======================================================== */}
             {authMode === 'register' && !registrationCompleteNotice && (
-              <form onSubmit={handleRegisterSubmit} className="space-y-4">
+              <form onSubmit={handleRegisterSubmit} className="space-y-3">
                 {/* Full Name */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
                     Full Name
                   </label>
                   <div className="relative">
-                    <UserIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                    <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
                     <input
                       type="text"
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="e.g. Rahul Sharma"
-                      className="w-full pl-10 pr-3.5 py-2.5 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 font-medium transition"
+                      className="w-full pl-9 pr-3 py-2 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 font-medium transition"
                     />
                   </div>
                 </div>
 
-                {/* Email Address with OTP Verification & Green Tick */}
+                {/* Email Address with Send OTP & Green Tick */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-1">
                     <label className="text-xs font-bold text-slate-800">
                       Email Address
                     </label>
                     {isEmailVerified && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                        Email Verified ✅
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                        Verified ✅
                       </span>
                     )}
                   </div>
 
                   <div className="relative">
                     <Mail
-                      className={`w-4 h-4 absolute left-3.5 top-3.5 pointer-events-none ${
+                      className={`w-4 h-4 absolute left-3 top-2.5 pointer-events-none ${
                         isEmailVerified ? 'text-emerald-500' : 'text-slate-400'
                       }`}
                     />
@@ -737,7 +675,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         setRegOtpSent(false);
                       }}
                       placeholder="name@example.com"
-                      className={`w-full pl-10 pr-24 py-2.5 text-xs rounded-2xl focus:outline-none font-medium transition ${
+                      className={`w-full pl-9 pr-24 py-2 text-xs rounded-xl focus:outline-none font-medium transition ${
                         isEmailVerified
                           ? 'border-2 border-emerald-500 bg-emerald-50/40 text-emerald-900 font-bold'
                           : 'border border-slate-200 text-slate-900 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 placeholder-slate-400'
@@ -748,31 +686,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         type="button"
                         onClick={handleSendRegisterOtp}
                         disabled={sendingOtp || !email || otpCountdown > 0}
-                        className="absolute right-1.5 top-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 text-white disabled:text-slate-400 text-[10px] font-bold rounded-xl transition shadow-sm cursor-pointer"
+                        className="absolute right-1 top-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 text-white disabled:text-slate-400 text-[10px] font-bold rounded-lg transition shadow-sm cursor-pointer"
                       >
                         {sendingOtp
                           ? 'Sending...'
                           : otpCountdown > 0
-                          ? `Resend (${otpCountdown}s)`
+                          ? `Wait ${otpCountdown}s`
                           : regOtpSent
-                          ? 'Resend OTP'
+                          ? 'Resend'
                           : 'Send OTP'}
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* OTP Input Box (Shows when OTP has been sent and email not yet verified) */}
+                {/* Compact OTP Input Box */}
                 {regOtpSent && !isEmailVerified && (
-                  <div className="p-3.5 bg-blue-50/95 border border-blue-200 rounded-2xl space-y-2.5 animate-fadeIn">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-[11px] font-bold text-blue-950">
-                        Enter 6-Digit OTP received in Email:
-                      </label>
+                  <div className="p-2.5 bg-blue-50/90 border border-blue-200 rounded-xl space-y-2 animate-fadeIn">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-blue-950">
+                      <span>Enter 6-Digit Email OTP:</span>
                       {otpCountdown > 0 && (
-                        <span className="text-[10px] text-blue-700 font-bold">
-                          Resend in {otpCountdown}s
-                        </span>
+                        <span className="text-[10px] text-blue-700">Resend in {otpCountdown}s</span>
                       )}
                     </div>
 
@@ -782,37 +716,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         maxLength={6}
                         value={regOtp}
                         onChange={(e) => setRegOtp(e.target.value.replace(/\D/g, ''))}
-                        placeholder="e.g. 123456"
-                        className="flex-1 px-3 py-2 text-center font-mono font-bold text-base tracking-widest text-slate-900 bg-white border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400"
+                        placeholder="123456"
+                        className="flex-1 px-3 py-1.5 text-center font-mono font-bold text-sm tracking-widest text-slate-900 bg-white border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       />
                       <button
                         type="button"
                         onClick={handleVerifyRegisterOtp}
                         disabled={verifyingOtp || regOtp.length !== 6}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1 cursor-pointer"
                       >
-                        {verifyingOtp ? 'Verifying...' : 'Verify OTP'}
+                        {verifyingOtp ? 'Verifying...' : 'Verify'}
                       </button>
                     </div>
 
-                    <div className="p-2.5 bg-white/80 border border-blue-200 rounded-xl text-[11px] text-blue-900 leading-snug space-y-1">
-                      <div className="font-bold flex items-center gap-1 text-blue-800">
-                        📬 Email Inbox / Spam Folder:
-                      </div>
-                      <p>
-                        A 6-digit verification code has been sent. If not visible in your Primary Inbox, please also check your <strong>Spam / Junk</strong> folder.
-                      </p>
-                    </div>
+                    <p className="text-[10px] text-blue-800 leading-tight">
+                      📬 Code sent. Please also check your <strong>Spam / Junk</strong> folder if not in Inbox.
+                    </p>
                   </div>
                 )}
 
                 {/* Password */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                    Set Password
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Password
                   </label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
                     <input
                       type="password"
                       required
@@ -820,35 +749,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Minimum 6 characters"
-                      className="w-full pl-10 pr-3.5 py-2.5 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 font-medium transition"
+                      className="w-full pl-9 pr-3 py-2 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 font-medium transition"
                     />
                   </div>
                 </div>
 
-                {/* Role Explanatory Info Card */}
+                {/* Role Note for Owner */}
                 {targetRole === 'OWNER' && (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-900 space-y-1">
-                    <span className="font-bold flex items-center gap-1 text-amber-800">
-                      <Building2 className="w-3.5 h-3.5" /> Notice for Library Owners:
-                    </span>
-                    <p>
-                      After registration, your account is submitted for Admin verification. You will be approved before accessing your owner dashboard.
-                    </p>
+                  <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-800 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                    <span>Owner accounts require Admin verification after registration.</span>
                   </div>
                 )}
 
-                {/* Registration Submit Button (Only active when Green Tick Verified) */}
-                <div className="pt-2">
+                {/* Register Submit Button */}
+                <div className="pt-1">
                   {!isEmailVerified && (
-                    <p className="text-[11px] text-amber-600 font-semibold text-center mb-2 flex items-center justify-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      Please verify your email via OTP to enable registration.
+                    <p className="text-[10px] text-amber-600 font-semibold text-center mb-1 flex items-center justify-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Verify email via OTP to enable registration.
                     </p>
                   )}
                   <button
                     type="submit"
                     disabled={loading || !isEmailVerified}
-                    className={`w-full py-3 rounded-2xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer ${
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs shadow transition flex items-center justify-center gap-2 cursor-pointer ${
                       !isEmailVerified
                         ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                         : currentConfig.buttonBg
@@ -857,22 +782,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     {loading
                       ? 'Creating Account...'
                       : targetRole === 'OWNER'
-                      ? 'Submit Owner Registration (Sends to Admin)'
-                      : '✅ Complete Student Registration (Instant Access)'}
+                      ? 'Submit Owner Registration'
+                      : '✅ Complete Student Registration'}
                   </button>
                 </div>
 
-                <div className="text-center pt-2">
-                  <span className="text-xs text-slate-500">Already registered? </span>
+                <div className="text-center pt-1">
+                  <span className="text-[11px] text-slate-500">Already registered? </span>
                   <button
                     type="button"
                     onClick={() => {
                       setAuthMode('login');
                       resetState();
                     }}
-                    className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                    className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
                   >
-                    Sign In instead
+                    Sign In
                   </button>
                 </div>
               </form>
@@ -882,13 +807,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {/* 3. FORGOT PASSWORD FLOW */}
             {/* ======================================================== */}
             {authMode === 'forgot_password' && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800">Password Recovery</span>
                   <button
                     type="button"
                     onClick={() => setAuthMode('login')}
-                    className="text-xs text-blue-600 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] text-blue-600 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="w-3 h-3" />
                     <span>Back to Sign In</span>
@@ -896,18 +821,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                    Registered Email Address
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Registered Email
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
                     <input
                       type="email"
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter your registered account email"
-                      className="w-full pl-10 pr-3.5 py-3 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 font-medium transition"
+                      placeholder="Enter registered email"
+                      className="w-full pl-9 pr-3 py-2 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400 font-medium transition"
                     />
                   </div>
                 </div>
@@ -917,14 +842,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type="button"
                     onClick={handleSendForgotOtp}
                     disabled={loading || !email}
-                    className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow transition cursor-pointer"
+                    className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow transition cursor-pointer"
                   >
                     {loading ? 'Sending Code...' : 'Send Password Reset Code'}
                   </button>
                 ) : (
-                  <form onSubmit={handleResetPassword} className="space-y-4">
+                  <form onSubmit={handleResetPassword} className="space-y-3">
                     <div>
-                      <label className="text-xs font-bold text-slate-800 mb-1.5 block">
+                      <label className="text-xs font-bold text-slate-800 mb-1 block">
                         Enter 6-Digit Reset Code
                       </label>
                       <input
@@ -933,25 +858,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         maxLength={6}
                         value={forgotOtp}
                         onChange={(e) => setForgotOtp(e.target.value)}
-                        placeholder="e.g. 123456"
-                        className="w-full px-3.5 py-3 text-center font-mono text-base font-bold text-slate-900 bg-blue-50/40 border border-blue-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        placeholder="123456"
+                        className="w-full px-3 py-2 text-center font-mono text-sm font-bold text-slate-900 bg-blue-50/40 border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                        Set New Password
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        New Password
                       </label>
                       <div className="relative">
-                        <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                        <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
                         <input
                           type="password"
                           required
                           minLength={6}
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="Enter new password"
-                          className="w-full pl-10 pr-3.5 py-3 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium transition"
+                          placeholder="New password (min 6 characters)"
+                          className="w-full pl-9 pr-3 py-2 text-xs text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium transition"
                         />
                       </div>
                     </div>
@@ -959,9 +884,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <button
                       type="submit"
                       disabled={loading || !newPassword}
-                      className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow transition cursor-pointer"
+                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow transition cursor-pointer"
                     >
-                      {loading ? 'Updating Password...' : 'Save New Password & Sign In'}
+                      {loading ? 'Updating Password...' : 'Save Password & Sign In'}
                     </button>
                   </form>
                 )}
@@ -969,9 +894,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             )}
           </div>
 
-          {/* Modal Footer Note */}
-          <div className="p-4 bg-slate-50 border-t border-slate-100 text-center text-[11px] text-slate-400">
-            LibSpace Private Study Network &copy; {new Date().getFullYear()} • Safe & Secure
+          {/* Compact Modal Footer */}
+          <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-center text-[10px] text-slate-400 flex-shrink-0">
+            LibSpace Private Study Network &copy; {new Date().getFullYear()}
           </div>
         </div>
       </div>
