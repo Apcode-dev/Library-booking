@@ -103,10 +103,10 @@ export const Navbar: React.FC = () => {
                 </Link>
               )}
 
-              {/* Owner View (Show if logged out OR logged in as OWNER) */}
-              {(!user || user.role === 'OWNER') && (
-                <button
-                  onClick={handleOwnerClick}
+              {/* Owner View (Show only if logged in as OWNER) */}
+              {user?.role === 'OWNER' && (
+                <Link
+                  to="/owner"
                   className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
                     isActive('/owner')
                       ? 'text-amber-700 bg-amber-50 font-extrabold'
@@ -114,14 +114,14 @@ export const Navbar: React.FC = () => {
                   }`}
                 >
                   <Building2 className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Owner Portal</span>
-                </button>
+                  <span>Owner Console</span>
+                </Link>
               )}
 
-              {/* Admin View (Show if logged out OR logged in as ADMIN) */}
-              {(!user || user.role === 'ADMIN') && (
-                <button
-                  onClick={handleAdminClick}
+              {/* Admin View (Show only if logged in as ADMIN) */}
+              {user?.role === 'ADMIN' && (
+                <Link
+                  to="/admin"
                   className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
                     isActive('/admin')
                       ? 'text-purple-700 bg-purple-50 font-extrabold'
@@ -129,8 +129,8 @@ export const Navbar: React.FC = () => {
                   }`}
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-                  <span>Admin Portal</span>
-                </button>
+                  <span>Admin Console</span>
+                </Link>
               )}
             </nav>
 
@@ -223,26 +223,12 @@ export const Navbar: React.FC = () => {
                 </div>
               </button>
             ) : (
-              <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-2xl text-center text-xs font-bold">
-                <button
-                  onClick={() => openAuthWithRole('USER')}
-                  className="py-2 px-1 bg-white rounded-xl text-blue-600 shadow-sm"
-                >
-                  🎓 Student
-                </button>
-                <button
-                  onClick={() => openAuthWithRole('OWNER')}
-                  className="py-2 px-1 bg-white rounded-xl text-amber-700 shadow-sm"
-                >
-                  🏢 Owner
-                </button>
-                <button
-                  onClick={() => openAuthWithRole('ADMIN')}
-                  className="py-2 px-1 bg-white rounded-xl text-purple-700 shadow-sm"
-                >
-                  🛡️ Admin
-                </button>
-              </div>
+              <button
+                onClick={() => openAuthWithRole('USER')}
+                className="w-full py-2.5 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center gap-2"
+              >
+                <span>🎓 Student Sign In / Register</span>
+              </button>
             )}
 
             <div className="space-y-1 pt-1">
@@ -268,24 +254,26 @@ export const Navbar: React.FC = () => {
                 </Link>
               )}
 
-              {(!user || user.role === 'OWNER') && (
-                <button
-                  onClick={handleOwnerClick}
+              {user?.role === 'OWNER' && (
+                <Link
+                  to="/owner"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-100 font-semibold text-xs text-left"
                 >
                   <Building2 className="w-4 h-4 text-amber-600" />
-                  Library Owner Portal
-                </button>
+                  Owner Console
+                </Link>
               )}
 
-              {(!user || user.role === 'ADMIN') && (
-                <button
-                  onClick={handleAdminClick}
+              {user?.role === 'ADMIN' && (
+                <Link
+                  to="/admin"
+                  onClick={() => setIsMobileMenuOpen(false)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-100 font-semibold text-xs text-left"
                 >
                   <ShieldCheck className="w-4 h-4 text-purple-600" />
-                  Admin Dashboard
-                </button>
+                  Admin Console
+                </Link>
               )}
             </div>
 
