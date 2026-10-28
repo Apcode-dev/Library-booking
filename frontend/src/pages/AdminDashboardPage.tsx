@@ -463,8 +463,16 @@ export const AdminDashboardPage: React.FC = () => {
       {/* Top Header */}
       <div className="bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-3.5">
+            <Link to="/" title="LibSpace Home">
+              <img
+                src="/images/libspace-logo.png"
+                alt="LibSpace Official Logo"
+                className="w-12 h-12 rounded-2xl object-contain shadow-xs hover:scale-105 transition"
+              />
+            </Link>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
               {isSubAdmin ? (
                 <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-extrabold border border-blue-200 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-blue-600" />
@@ -496,6 +504,7 @@ export const AdminDashboardPage: React.FC = () => {
                 : 'LibSpace Central Governance & Operations'}
             </h1>
           </div>
+        </div>
 
           <div className="flex items-center gap-3">
             {!isSubAdmin && (

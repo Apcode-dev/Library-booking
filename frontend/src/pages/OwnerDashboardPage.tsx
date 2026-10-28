@@ -774,7 +774,11 @@ export const OwnerDashboardPage: React.FC = () => {
   if (user?.role !== 'OWNER' && user?.role !== 'ADMIN') {
     return (
       <div className="max-w-xl mx-auto my-20 p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-4 shadow-sm">
-        <Building2 className="w-12 h-12 text-amber-500 mx-auto" />
+        <img
+          src="/images/libspace-logo.png"
+          alt="LibSpace Official Logo"
+          className="w-16 h-16 rounded-2xl object-contain mx-auto shadow-md"
+        />
         <h2 className="text-xl font-bold text-slate-800">Library Owner Portal</h2>
         <p className="text-xs text-slate-500">
           You must be logged in as a verified <strong>Library Owner</strong> to manage study spaces, seats, and view revenue.
@@ -845,32 +849,41 @@ export const OwnerDashboardPage: React.FC = () => {
             </div>
           ) : (
             /* Master Account Multi-Library Overview Header */
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/10 to-indigo-500/10 text-indigo-800 text-xs font-extrabold border border-indigo-200 flex items-center gap-1.5 shadow-2xs">
-                  <Crown className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Master Owner Console</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsProfileModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-indigo-700 font-bold bg-slate-100 hover:bg-indigo-50 px-2.5 py-1 rounded-full border border-slate-200 transition cursor-pointer"
-                >
-                  <img
-                    src={user.avatar || 'https://api.dicebear.com/7.x/initials/svg?seed=Owner'}
-                    alt={user.name}
-                    className="w-4 h-4 rounded-full object-cover"
-                  />
-                  <span>Welcome, {user.name}</span>
-                  <span className="text-[10px] text-indigo-700 font-extrabold underline ml-1">Edit Profile</span>
-                </button>
+            <div className="flex items-center gap-3.5">
+              <Link to="/" title="LibSpace Home">
+                <img
+                  src="/images/libspace-logo.png"
+                  alt="LibSpace Official Logo"
+                  className="w-12 h-12 rounded-2xl object-contain shadow-xs hover:scale-105 transition"
+                />
+              </Link>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/10 to-indigo-500/10 text-indigo-800 text-xs font-extrabold border border-indigo-200 flex items-center gap-1.5 shadow-2xs">
+                    <Crown className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Master Owner Console</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsProfileModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-indigo-700 font-bold bg-slate-100 hover:bg-indigo-50 px-2.5 py-1 rounded-full border border-slate-200 transition cursor-pointer"
+                  >
+                    <img
+                      src={user.avatar || 'https://api.dicebear.com/7.x/initials/svg?seed=Owner'}
+                      alt={user.name}
+                      className="w-4 h-4 rounded-full object-cover"
+                    />
+                    <span>Welcome, {user.name}</span>
+                    <span className="text-[10px] text-indigo-700 font-extrabold underline ml-1">Edit Profile</span>
+                  </button>
+                </div>
+                <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                  Library Performance & Revenue
+                </h1>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Master account overview: manage up to 5 library branches with 6-digit PIN security.
+                </p>
               </div>
-              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                Library Performance & Revenue
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Master account overview: manage up to 5 library branches with 6-digit PIN security.
-              </p>
             </div>
           )}
 

@@ -28,6 +28,7 @@ import {
   Layers,
   Award,
   Check,
+  Smartphone,
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { STANDARD_AMENITIES } from '../constants/amenities';
@@ -243,6 +244,15 @@ export const HomePage: React.FC = () => {
         <div className="max-w-5xl mx-auto text-center relative z-10 space-y-4">
           {!user ? (
             <>
+              {/* Official Brand Logo Showcase */}
+              <div className="flex items-center justify-center mb-2">
+                <img
+                  src="/images/libspace-logo.png"
+                  alt="LibSpace Official Logo"
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl object-contain shadow-2xl shadow-blue-500/30 hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-blue-300 text-xs font-semibold shadow-inner">
                 <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
                 <span>India's Modern Library & Study Seat Booking Platform</span>
@@ -276,6 +286,20 @@ export const HomePage: React.FC = () => {
                   className="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 font-semibold text-xs sm:text-sm border border-white/15 backdrop-blur-md transition flex items-center gap-1.5"
                 >
                   <span>Student Sign In</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    alert(
+                      '📱 Install LibSpace App:\n\n1. Tap the browser menu (⋮ on Android Chrome, or Share on Safari)\n2. Select "Add to Home Screen" or "Install App"\n3. Enjoy fullscreen LibSpace app with the official app icon!'
+                    );
+                  }}
+                  className="px-4 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-800 text-slate-200 font-bold text-xs sm:text-sm border border-slate-700 backdrop-blur-md transition flex items-center gap-1.5 cursor-pointer"
+                  title="Install LibSpace on your phone"
+                >
+                  <Smartphone className="w-4 h-4 text-emerald-400" />
+                  <span>📲 Get App</span>
                 </button>
               </div>
             </>

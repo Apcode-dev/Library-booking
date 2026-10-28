@@ -358,9 +358,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
           <div className="relative z-10 space-y-4">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-white/15 border border-white/20 text-white backdrop-blur-sm">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>{currentConfig.badge}</span>
+            <div className="flex items-center justify-between">
+              <img
+                src="/images/libspace-logo.png"
+                alt="LibSpace Official Logo"
+                className="w-10 h-10 rounded-xl object-contain shadow-md"
+              />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-white/15 border border-white/20 text-white backdrop-blur-sm">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>{currentConfig.badge}</span>
+              </div>
             </div>
 
             <div>
@@ -402,6 +409,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* Clean Top Header (Role badge + Title + Close Button) */}
           <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 flex-shrink-0">
             <div className="flex items-center gap-2">
+              <img
+                src="/images/libspace-logo.png"
+                alt="LibSpace"
+                className="w-6 h-6 rounded-lg object-contain shadow-2xs"
+              />
               <span
                 className={`text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-lg border ${currentConfig.badgeClass}`}
               >

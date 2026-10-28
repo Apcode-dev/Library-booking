@@ -123,16 +123,18 @@ export const Footer: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pt-4">
             {/* Column 1: Brand & Technology Architecture */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/30">
-                  <BookOpen className="w-5 h-5" />
-                </div>
+              <div className="flex items-center gap-3">
+                <img
+                  src="/images/libspace-logo.png"
+                  alt="LibSpace Official Logo"
+                  className="w-10 h-10 rounded-xl object-contain shadow-md"
+                />
                 <div>
                   <span className="text-lg font-black text-white tracking-tight block leading-tight">
-                    LibSpace
+                    Lib<span className="text-blue-400">Space</span>
                   </span>
-                  <span className="text-[10px] text-blue-400 uppercase tracking-widest font-extrabold">
-                    Seat Booking Platform
+                  <span className="text-[10px] text-slate-400 uppercase tracking-widest font-extrabold">
+                    Find • Book • Study
                   </span>
                 </div>
               </div>
