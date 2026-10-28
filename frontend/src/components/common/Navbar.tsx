@@ -167,17 +167,6 @@ export const Navbar: React.FC = () => {
 
             {/* Desktop Auth Section */}
             <div className="hidden md:flex items-center gap-2.5">
-              {/* Install App Button */}
-              <button
-                type="button"
-                onClick={handleInstallApp}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition transform hover:-translate-y-0.5 cursor-pointer"
-                title="Install LibSpace Official App on Device"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>📲 Install App</span>
-              </button>
-
               {user ? (
                 <div className="flex items-center gap-3">
                   <button
@@ -273,16 +262,6 @@ export const Navbar: React.FC = () => {
               </button>
             )}
 
-            {/* Mobile PWA Install App Button */}
-            <button
-              type="button"
-              onClick={handleInstallApp}
-              className="w-full py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Smartphone className="w-4 h-4 text-emerald-400" />
-              <span>📲 Install LibSpace App on Phone</span>
-            </button>
-
             <div className="space-y-1 pt-1">
               {(!user || user.role === 'USER') && (
                 <Link
@@ -330,17 +309,6 @@ export const Navbar: React.FC = () => {
             </div>
 
             <div className="pt-2 border-t border-slate-100">
-              {/* Install App Button */}
-              <button
-                type="button"
-                onClick={handleInstallApp}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition transform hover:-translate-y-0.5 cursor-pointer"
-                title="Install LibSpace Official App on Device"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>📲 Install App</span>
-              </button>
-
               {user ? (
                 <button
                   onClick={() => {

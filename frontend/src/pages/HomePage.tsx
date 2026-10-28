@@ -287,20 +287,6 @@ export const HomePage: React.FC = () => {
                 >
                   <span>Student Sign In</span>
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    alert(
-                      '📱 Install LibSpace App:\n\n1. Tap the browser menu (⋮ on Android Chrome, or Share on Safari)\n2. Select "Add to Home Screen" or "Install App"\n3. Enjoy fullscreen LibSpace app with the official app icon!'
-                    );
-                  }}
-                  className="px-4 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-800 text-slate-200 font-bold text-xs sm:text-sm border border-slate-700 backdrop-blur-md transition flex items-center gap-1.5 cursor-pointer"
-                  title="Install LibSpace on your phone"
-                >
-                  <Smartphone className="w-4 h-4 text-emerald-400" />
-                  <span>📲 Get App</span>
-                </button>
               </div>
             </>
           ) : (

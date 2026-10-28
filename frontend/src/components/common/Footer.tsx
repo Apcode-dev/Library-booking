@@ -153,6 +153,23 @@ export const Footer: React.FC = () => {
                   AES-256 JWT Single-Device
                 </span>
               </div>
+
+              {/* Official Android App (.APK) Download Button */}
+              <div className="pt-2">
+                <a
+                  href="/downloads/libspace-release.apk"
+                  download="LibSpace-v1.0.apk"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 text-white rounded-2xl text-xs font-bold shadow-lg shadow-emerald-950/40 border border-emerald-400/20 transition transform hover:-translate-y-0.5 cursor-pointer"
+                  title="Download LibSpace Official Android APK directly to your phone"
+                >
+                  <img
+                    src="/images/libspace-logo.png"
+                    alt="LibSpace App"
+                    className="w-5 h-5 rounded-lg object-contain bg-white/10"
+                  />
+                  <span>📲 Download Android App (.APK)</span>
+                </a>
+              </div>
             </div>
 
             {/* Column 2: For Students & Seekers */}
@@ -191,6 +208,16 @@ export const Footer: React.FC = () => {
                     <ChevronRight className="w-3 h-3 text-slate-600" />
                     <span>Instant Digital QR Tickets</span>
                   </Link>
+                </li>
+                <li className="pt-1">
+                  <a
+                    href="/downloads/libspace-release.apk"
+                    download="LibSpace-v1.0.apk"
+                    className="text-emerald-400 hover:text-emerald-300 font-extrabold transition flex items-center gap-1.5"
+                  >
+                    <ChevronRight className="w-3 h-3 text-emerald-400" />
+                    <span>📲 Android APK (Direct Download)</span>
+                  </a>
                 </li>
               </ul>
             </div>

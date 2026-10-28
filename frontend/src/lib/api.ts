@@ -1,13 +1,30 @@
 import axios from 'axios';
 
-// Relative /api automatically routes through Vite dev proxy (local and Cloudflare tunnel)
-export const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
+// Detect whether we are running in an installed native mobile app (Capacitor WebView)
+const isNative =
+  typeof window !== 'undefined' &&
+  (Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+    window.location.protocol === 'capacitor:' ||
+    window.location.hostname === 'localhost' && navigator.userAgent.includes('Android'));
+
+// Stored custom API URL (allows dynamic configuration from in-app settings if needed)
+const storedApiUrl = typeof window !== 'undefined' ? localStorage.getItem('libspace_custom_api_url') : null;
+
+// Official Render production backend URL
+export const PRODUCTION_API_URL = 'https://libspace-backend.onrender.com/api';
+
+// On Web: use VITE_API_URL or relative /api. On Native Android: use configured or production backend.
+export const API_BASE_URL =
+  storedApiUrl ||
+  (import.meta as any).env?.VITE_API_URL ||
+  (isNative ? PRODUCTION_API_URL : '/api');
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 15000,
 });
 
 // Automatically attach stored JWT token

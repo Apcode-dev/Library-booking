@@ -37,3 +37,15 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Android Keystore & Local Properties (NEVER commit secrets or signing keys)
+*.keystore
+*.jks
+local.properties
+*/local.properties
+.gradle/
+*/.gradle/
+build/
+*/build/
+frontend/android/app/build/
+frontend/android/build/

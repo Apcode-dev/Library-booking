@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { App as CapApp } from '@capacitor/app';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/common/Navbar';
 import Footer from './components/common/Footer';
@@ -11,6 +12,27 @@ import OwnerDashboardPage from './pages/OwnerDashboardPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 
 export const App: React.FC = () => {
+  useEffect(() => {
+    let backHandler: any;
+    try {
+      backHandler = CapApp.addListener('backButton', ({ canGoBack }) => {
+        if (window.location.pathname !== '/') {
+          window.history.back();
+        } else if (canGoBack) {
+          window.history.back();
+        } else {
+          CapApp.exitApp();
+        }
+      });
+    } catch {
+      // Ignored if running on standard web browser
+    }
+
+    return () => {
+      backHandler?.then?.((sub: any) => sub.remove());
+    };
+  }, []);
+
   return (
     <AuthProvider>
       <Toaster

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">LibSpace</string>
+    <string name="title_activity_main">LibSpace</string>
+    <string name="package_name">com.libspace.app</string>
+    <string name="custom_url_scheme">com.libspace.app</string>
+</resources>
