@@ -28,9 +28,9 @@ function sendBrevoPost(payload: any): Promise<{ ok: boolean; status: number; dat
           'content-length': Buffer.byteLength(postData),
         },
       },
-      (res) => {
+      (res: any) => {
         let raw = '';
-        res.on('data', (chunk) => (raw += chunk));
+        res.on('data', (chunk: any) => (raw += chunk));
         res.on('end', () => {
           let parsed: any = {};
           try {
@@ -47,7 +47,7 @@ function sendBrevoPost(payload: any): Promise<{ ok: boolean; status: number; dat
       }
     );
 
-    req.on('error', (err) => {
+    req.on('error', (err: any) => {
       resolve({
         ok: false,
         status: 500,
