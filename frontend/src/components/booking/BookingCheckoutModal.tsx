@@ -19,6 +19,7 @@ import {
   Sparkles,
   ArrowRight,
   Lock,
+  Camera,
 } from 'lucide-react';
 
 interface BookingCheckoutModalProps {
@@ -26,6 +27,7 @@ interface BookingCheckoutModalProps {
   onClose: () => void;
   lockData: SeatLockResponse | null;
   onLockExpired: () => void;
+  photos?: string[];
 }
 
 const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_THFHFpRR2qfrt7';
@@ -50,6 +52,7 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
   onClose,
   lockData,
   onLockExpired,
+  photos,
 }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -224,6 +227,35 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   <span>{error}</span>
+                </div>
+              )}
+
+              {/* 3-Photo Library Preview Strip */}
+              {photos && photos.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                    <span className="flex items-center gap-1">
+                      <Camera className="w-3.5 h-3.5 text-blue-600" />
+                      <span>{lockData.seat.libraryName} (3 Views)</span>
+                    </span>
+                    <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-bold">
+                      Verified Study Space
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 h-20 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 p-1 shadow-2xs">
+                    <div className="relative rounded-xl overflow-hidden group">
+                      <img src={photos[0]} alt="Front" className="w-full h-full object-cover group-hover:scale-105 transition" />
+                      <span className="absolute bottom-1 left-1 bg-black/70 backdrop-blur-xs text-white text-[9px] px-1.5 py-0.5 rounded font-bold">1. Banner</span>
+                    </div>
+                    <div className="relative rounded-xl overflow-hidden group">
+                      <img src={photos[1] || photos[0]} alt="Hall" className="w-full h-full object-cover group-hover:scale-105 transition" />
+                      <span className="absolute bottom-1 left-1 bg-black/70 backdrop-blur-xs text-white text-[9px] px-1.5 py-0.5 rounded font-bold">2. Study Hall</span>
+                    </div>
+                    <div className="relative rounded-xl overflow-hidden group">
+                      <img src={photos[2] || photos[0]} alt="Amenities" className="w-full h-full object-cover group-hover:scale-105 transition" />
+                      <span className="absolute bottom-1 left-1 bg-black/70 backdrop-blur-xs text-white text-[9px] px-1.5 py-0.5 rounded font-bold">3. Amenities</span>
+                    </div>
+                  </div>
                 </div>
               )}
 

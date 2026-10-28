@@ -114,6 +114,9 @@ export class LibraryController {
           latitude: lib.latitude,
           longitude: lib.longitude,
           photos,
+          bannerImage: lib.bannerImage || photos[0] || 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1000',
+          interiorImage: lib.interiorImage || photos[1] || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=1000',
+          amenitiesImage: lib.amenitiesImage || photos[2] || 'https://images.unsplash.com/photo-1517842645767-c639042777db?w=1000',
           facilities,
           hourlyRate: lib.hourlyRate,
           dailyRate: lib.dailyRate,
@@ -294,8 +297,13 @@ export class LibraryController {
         return;
       }
 
-      const photos = JSON.parse(library.photos || '[]');
+      const rawPhotos = JSON.parse(library.photos || '[]');
       const facilities = JSON.parse(library.facilities || '[]');
+
+      const banner = library.bannerImage || rawPhotos[0] || 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1000';
+      const interior = library.interiorImage || rawPhotos[1] || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=1000';
+      const amenities = library.amenitiesImage || rawPhotos[2] || 'https://images.unsplash.com/photo-1517842645767-c639042777db?w=1000';
+      const photos = [banner, interior, amenities];
 
       const avgRating =
         library.reviews.length > 0
@@ -312,6 +320,9 @@ export class LibraryController {
         library: {
           ...library,
           photos,
+          bannerImage: banner,
+          interiorImage: interior,
+          amenitiesImage: amenities,
           facilities,
           rating: avgRating,
           reviewCount: library.reviews.length,

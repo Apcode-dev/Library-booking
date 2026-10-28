@@ -50,6 +50,9 @@ export interface Library {
   latitude: number;
   longitude: number;
   photos: string[];
+  bannerImage?: string;
+  interiorImage?: string;
+  amenitiesImage?: string;
   facilities: string[];
   hourlyRate: number;
   dailyRate?: number;

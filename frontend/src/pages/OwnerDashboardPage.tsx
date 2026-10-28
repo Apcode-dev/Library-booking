@@ -42,6 +42,7 @@ import {
   Eye,
   EyeOff,
   Layers,
+  Upload,
 } from 'lucide-react';
 
 import AuthModal from '../components/common/AuthModal';
@@ -80,6 +81,39 @@ export const OwnerDashboardPage: React.FC = () => {
   const [pincodeError, setPincodeError] = useState<string | null>(null);
   const [availableLocalities, setAvailableLocalities] = useState<string[]>([]);
   const [hourlyRate, setHourlyRate] = useState('40');
+
+  // 3-Image Showcase Upload States
+  const [bannerImage, setBannerImage] = useState(
+    'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1000&auto=format&fit=crop&q=80'
+  );
+  const [interiorImage, setInteriorImage] = useState(
+    'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=1000&auto=format&fit=crop&q=80'
+  );
+  const [amenitiesImage, setAmenitiesImage] = useState(
+    'https://images.unsplash.com/photo-1517842645767-c639042777db?w=1000&auto=format&fit=crop&q=80'
+  );
+
+  const handleImageFileUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    target: 'banner' | 'interior' | 'amenities'
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Selected image exceeds 5MB. Please choose a smaller image.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const dataUrl = uploadEvent.target?.result as string;
+      if (target === 'banner') setBannerImage(dataUrl);
+      else if (target === 'interior') setInteriorImage(dataUrl);
+      else if (target === 'amenities') setAmenitiesImage(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Category-wise Seat Allocation
   const [hourlySeats, setHourlySeats] = useState('10');
@@ -571,6 +605,10 @@ export const OwnerDashboardPage: React.FC = () => {
         district,
         state,
         pincode,
+        bannerImage,
+        interiorImage,
+        amenitiesImage,
+        photos: [bannerImage, interiorImage, amenitiesImage],
         totalSeats: computedTotalSeats,
         hourlyRate: Number(hourlyRate),
         hourlySeats: parsedHourlySeats,
@@ -603,6 +641,9 @@ export const OwnerDashboardPage: React.FC = () => {
         setState('');
         setPincode('');
         setPincodeError(null);
+        setBannerImage('https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1000&auto=format&fit=crop&q=80');
+        setInteriorImage('https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=1000&auto=format&fit=crop&q=80');
+        setAmenitiesImage('https://images.unsplash.com/photo-1517842645767-c639042777db?w=1000&auto=format&fit=crop&q=80');
         setAvailableLocalities([]);
         setHourlyRate('40');
         setHourlySeats('10');
@@ -2318,6 +2359,232 @@ export const OwnerDashboardPage: React.FC = () => {
                   <span>{pincodeError}</span>
                 </div>
               )}
+
+              {/* 📸 3 Library Photos (Front Banner, Study Hall, Amenities) */}
+              <div className="p-4 bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-slate-50 rounded-2xl border border-blue-200/80 space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-blue-600" />
+                      📸 Library Showcase Photos (3 Images)
+                    </h4>
+                    <p className="text-[11px] text-slate-600 leading-snug mt-0.5">
+                      <strong>Image 1</strong> shows on the front page card. <strong>Image 2 & 3</strong> show in the 3-image collage when students checkout / book seats.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 shrink-0 self-start sm:self-auto">
+                    3 Images Required
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Photo 1: Front Banner */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                          1. Front Banner
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-semibold">Front Page</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Main cover image displayed on cards & listings
+                      </p>
+                    </div>
+
+                    <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-100 border border-slate-200 group">
+                      <img
+                        src={bannerImage}
+                        alt="Front Banner"
+                        className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                      <label className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-pointer text-white text-[11px] font-bold gap-1.5">
+                        <Upload className="w-3.5 h-3.5" /> Replace Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleImageFileUpload(e, 'banner')}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center gap-1.5">
+                        <label className="flex-1 text-center py-1.5 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] rounded-lg border border-blue-200 cursor-pointer transition flex items-center justify-center gap-1">
+                          <Upload className="w-3 h-3" /> Upload File
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleImageFileUpload(e, 'banner')}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setBannerImage('https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1000&auto=format&fit=crop&q=80')}
+                          className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-[10px] rounded-lg transition"
+                          title="Use High-Res Library Preset"
+                        >
+                          Preset
+                        </button>
+                      </div>
+                      <input
+                        type="url"
+                        value={bannerImage}
+                        onChange={(e) => setBannerImage(e.target.value)}
+                        placeholder="Or paste image URL..."
+                        className="w-full px-2 py-1 text-[10px] border border-slate-200 rounded-lg bg-slate-50 text-slate-700 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Photo 2: Study Hall Interior */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                          2. Study Hall
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-semibold">Booking Collage</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Interior reading tables & quiet study zones
+                      </p>
+                    </div>
+
+                    <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-100 border border-slate-200 group">
+                      <img
+                        src={interiorImage}
+                        alt="Study Hall"
+                        className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                      <label className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-pointer text-white text-[11px] font-bold gap-1.5">
+                        <Upload className="w-3.5 h-3.5" /> Replace Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleImageFileUpload(e, 'interior')}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center gap-1.5">
+                        <label className="flex-1 text-center py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-[10px] rounded-lg border border-amber-200 cursor-pointer transition flex items-center justify-center gap-1">
+                          <Upload className="w-3 h-3" /> Upload File
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleImageFileUpload(e, 'interior')}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setInteriorImage('https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=1000&auto=format&fit=crop&q=80')}
+                          className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-[10px] rounded-lg transition"
+                          title="Use High-Res Library Preset"
+                        >
+                          Preset
+                        </button>
+                      </div>
+                      <input
+                        type="url"
+                        value={interiorImage}
+                        onChange={(e) => setInteriorImage(e.target.value)}
+                        placeholder="Or paste image URL..."
+                        className="w-full px-2 py-1 text-[10px] border border-slate-200 rounded-lg bg-slate-50 text-slate-700 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Photo 3: Amenities & Desk Facilities */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                          3. Amenities
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-semibold">Booking Collage</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Power sockets, Wi-Fi routers & desk setup
+                      </p>
+                    </div>
+
+                    <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-100 border border-slate-200 group">
+                      <img
+                        src={amenitiesImage}
+                        alt="Amenities"
+                        className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                      <label className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-pointer text-white text-[11px] font-bold gap-1.5">
+                        <Upload className="w-3.5 h-3.5" /> Replace Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleImageFileUpload(e, 'amenities')}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center gap-1.5">
+                        <label className="flex-1 text-center py-1.5 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[10px] rounded-lg border border-purple-200 cursor-pointer transition flex items-center justify-center gap-1">
+                          <Upload className="w-3 h-3" /> Upload File
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleImageFileUpload(e, 'amenities')}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setAmenitiesImage('https://images.unsplash.com/photo-1517842645767-c639042777db?w=1000&auto=format&fit=crop&q=80')}
+                          className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-[10px] rounded-lg transition"
+                          title="Use High-Res Library Preset"
+                        >
+                          Preset
+                        </button>
+                      </div>
+                      <input
+                        type="url"
+                        value={amenitiesImage}
+                        onChange={(e) => setAmenitiesImage(e.target.value)}
+                        placeholder="Or paste image URL..."
+                        className="w-full px-2 py-1 text-[10px] border border-slate-200 rounded-lg bg-slate-50 text-slate-700 focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Collage Preview */}
+                <div className="pt-2 border-t border-blue-200/60">
+                  <span className="text-[10px] font-bold text-blue-900 block mb-1">
+                    ✨ Student Checkout Collage Preview:
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5 h-16 rounded-xl overflow-hidden border border-blue-200 bg-white p-1">
+                    <div className="col-span-2 relative rounded-lg overflow-hidden">
+                      <img src={bannerImage} alt="Cover Preview" className="w-full h-full object-cover" />
+                      <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] px-1 rounded font-bold">1. Cover Banner</span>
+                    </div>
+                    <div className="grid grid-rows-2 gap-1">
+                      <div className="relative rounded overflow-hidden">
+                        <img src={interiorImage} alt="Hall Preview" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0.5 left-0.5 bg-black/60 text-white text-[8px] px-1 rounded">2. Hall</span>
+                      </div>
+                      <div className="relative rounded overflow-hidden">
+                        <img src={amenitiesImage} alt="Amenities Preview" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0.5 left-0.5 bg-black/60 text-white text-[8px] px-1 rounded">3. Amenities</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Hourly Pricing & Category Seats */}
               <div>

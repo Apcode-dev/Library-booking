@@ -8,7 +8,7 @@ interface LibraryCardProps {
 }
 
 export const LibraryCard: React.FC<LibraryCardProps> = ({ library }) => {
-  const photo = library.photos?.[0] || 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=800&auto=format&fit=crop&q=80';
+  const photo = library.bannerImage || library.photos?.[0] || 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=800&auto=format&fit=crop&q=80';
   const hasMembership = library.enableMembership !== false && (library.enableMonthly !== false || library.enableYearly !== false);
 
   return (

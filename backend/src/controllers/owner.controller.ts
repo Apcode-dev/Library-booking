@@ -37,6 +37,9 @@ export class OwnerController {
         latitude,
         longitude,
         photos,
+        bannerImage,
+        interiorImage,
+        amenitiesImage,
         facilities,
         hourlyRate,
         dailyRate,
@@ -92,11 +95,14 @@ export class OwnerController {
           pincode: pincode || '110001',
           latitude: Number(latitude) || 28.6139,
           longitude: Number(longitude) || 77.209,
-          photos: JSON.stringify(
-            Array.isArray(photos) && photos.length > 0
-              ? photos
-              : ['https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=800&auto=format&fit=crop&q=80']
-          ),
+          bannerImage: bannerImage || (Array.isArray(photos) && photos[0]) || 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1000&auto=format&fit=crop&q=80',
+          interiorImage: interiorImage || (Array.isArray(photos) && photos[1]) || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=1000&auto=format&fit=crop&q=80',
+          amenitiesImage: amenitiesImage || (Array.isArray(photos) && photos[2]) || 'https://images.unsplash.com/photo-1517842645767-c639042777db?w=1000&auto=format&fit=crop&q=80',
+          photos: JSON.stringify([
+            bannerImage || (Array.isArray(photos) && photos[0]) || 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1000&auto=format&fit=crop&q=80',
+            interiorImage || (Array.isArray(photos) && photos[1]) || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=1000&auto=format&fit=crop&q=80',
+            amenitiesImage || (Array.isArray(photos) && photos[2]) || 'https://images.unsplash.com/photo-1517842645767-c639042777db?w=1000&auto=format&fit=crop&q=80',
+          ]),
           facilities: JSON.stringify(
             Array.isArray(facilities) && facilities.length > 0
               ? facilities
@@ -372,6 +378,9 @@ export class OwnerController {
         closingTime,
         facilities,
         photos,
+        bannerImage,
+        interiorImage,
+        amenitiesImage,
       } = req.body;
 
       const updated = await prisma.library.update({
@@ -397,6 +406,9 @@ export class OwnerController {
           ...(openingTime && { openingTime }),
           ...(closingTime && { closingTime }),
           ...(facilities && { facilities: JSON.stringify(facilities) }),
+          ...(bannerImage !== undefined && { bannerImage }),
+          ...(interiorImage !== undefined && { interiorImage }),
+          ...(amenitiesImage !== undefined && { amenitiesImage }),
           ...(photos && { photos: JSON.stringify(photos) }),
         },
       });

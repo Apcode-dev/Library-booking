@@ -70,6 +70,9 @@ model Library {
   latitude        Float
   longitude       Float
   photos          String      // JSON string array of photo URLs
+  bannerImage     String?     // Primary exterior / front banner image URL
+  interiorImage   String?     // Study Hall / interior seating image URL
+  amenitiesImage  String?     // Facilities / amenities / desk image URL
   facilities      String      // JSON string array of facilities e.g. ["AC", "High-speed WiFi", "Power Sockets"]
   hourlyRate      Float
   dailyRate       Float?

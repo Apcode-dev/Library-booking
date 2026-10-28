@@ -21,6 +21,7 @@ import {
   ArrowRight,
   MessageSquare,
   Award,
+  Camera,
 } from 'lucide-react';
 
 export const LibraryDetailsPage: React.FC = () => {
@@ -324,9 +325,9 @@ export const LibraryDetailsPage: React.FC = () => {
     ? (() => { try { return JSON.parse(library.facilities); } catch { return []; } })()
     : [];
 
-  const mainPhoto = photos[0] || 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=800';
-  const secondPhoto = photos[1] || mainPhoto;
-  const thirdPhoto = photos[2] || mainPhoto;
+  const mainPhoto = library.bannerImage || photos[0] || 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1000';
+  const secondPhoto = library.interiorImage || photos[1] || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=1000';
+  const thirdPhoto = library.amenitiesImage || photos[2] || 'https://images.unsplash.com/photo-1517842645767-c639042777db?w=1000';
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
@@ -344,28 +345,115 @@ export const LibraryDetailsPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-8">
         {/* Photo Gallery & Title Block */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 overflow-hidden space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl overflow-hidden max-h-[380px]">
-            <div className="md:col-span-2 h-64 md:h-full bg-slate-100 overflow-hidden">
-              <img
-                src={mainPhoto}
-                alt={library.name}
-                className="w-full h-full object-cover hover:scale-105 transition duration-500"
-              />
+          {/* 3-Photo Responsive Showcase Collage */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500 px-1">
+              <span className="flex items-center gap-1.5 text-slate-700">
+                <Camera className="w-4 h-4 text-blue-600" />
+                <span>Verified 3-View Space Showcase</span>
+              </span>
+              <span className="text-[11px] text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 font-bold">
+                3 Photos Available
+              </span>
             </div>
-            <div className="hidden md:flex flex-col gap-3">
-              <div className="h-1/2 bg-slate-100 overflow-hidden rounded-xl">
+
+            {/* Desktop Layout (md+) */}
+            <div className="hidden md:grid md:grid-cols-3 gap-3 rounded-2xl overflow-hidden h-[360px]">
+              {/* Photo 1: Front Banner */}
+              <div className="md:col-span-2 relative bg-slate-100 overflow-hidden group rounded-2xl">
                 <img
-                  src={secondPhoto}
-                  alt={library.name}
-                  className="w-full h-full object-cover hover:scale-105 transition duration-500"
+                  src={mainPhoto}
+                  alt={`${library.name} Front Banner`}
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-xs font-bold border border-white/20">
+                    🏢 1. Front / Main Banner
+                  </span>
+                </div>
               </div>
-              <div className="h-1/2 bg-slate-100 overflow-hidden rounded-xl">
+
+              {/* Photo 2 & 3: Stacked */}
+              <div className="flex flex-col gap-3 h-full">
+                {/* Photo 2: Study Hall */}
+                <div className="h-1/2 relative bg-slate-100 overflow-hidden rounded-xl group">
+                  <img
+                    src={secondPhoto}
+                    alt={`${library.name} Study Hall`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute bottom-2.5 left-2.5">
+                    <span className="px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md text-white text-[11px] font-bold border border-white/20">
+                      📚 2. Study Hall / Desks
+                    </span>
+                  </div>
+                </div>
+
+                {/* Photo 3: Amenities */}
+                <div className="h-1/2 relative bg-slate-100 overflow-hidden rounded-xl group">
+                  <img
+                    src={thirdPhoto}
+                    alt={`${library.name} Amenities`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute bottom-2.5 left-2.5">
+                    <span className="px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-md text-white text-[11px] font-bold border border-white/20">
+                      ⚡ 3. Amenities & Facilities
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Layout (< md) */}
+            <div className="md:hidden space-y-2">
+              {/* Photo 1: Front Banner */}
+              <div className="relative h-48 rounded-2xl overflow-hidden bg-slate-100 group">
                 <img
-                  src={thirdPhoto}
-                  alt={library.name}
-                  className="w-full h-full object-cover hover:scale-105 transition duration-500"
+                  src={mainPhoto}
+                  alt={`${library.name} Front Banner`}
+                  className="w-full h-full object-cover"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute bottom-2.5 left-2.5">
+                  <span className="px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-xs font-bold border border-white/20">
+                    🏢 1. Front Banner
+                  </span>
+                </div>
+              </div>
+
+              {/* Photo 2 & 3 side by side */}
+              <div className="grid grid-cols-2 gap-2 h-28">
+                <div className="relative rounded-xl overflow-hidden bg-slate-100 group">
+                  <img
+                    src={secondPhoto}
+                    alt={`${library.name} Study Hall`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute bottom-1.5 left-1.5">
+                    <span className="px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-white text-[10px] font-bold border border-white/20">
+                      📚 2. Study Hall
+                    </span>
+                  </div>
+                </div>
+
+                <div className="relative rounded-xl overflow-hidden bg-slate-100 group">
+                  <img
+                    src={thirdPhoto}
+                    alt={`${library.name} Amenities`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute bottom-1.5 left-1.5">
+                    <span className="px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-white text-[10px] font-bold border border-white/20">
+                      ⚡ 3. Amenities
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -943,6 +1031,7 @@ export const LibraryDetailsPage: React.FC = () => {
           fetchSeatAvailability();
         }}
         lockData={lockData}
+        photos={[mainPhoto, secondPhoto, thirdPhoto]}
         onLockExpired={() => {
           fetchSeatAvailability();
           setSelectedSeat(null);
