@@ -11,13 +11,15 @@ const isNative =
 const storedApiUrl = typeof window !== 'undefined' ? localStorage.getItem('libspace_custom_api_url') : null;
 
 // Official Render production backend URL
-export const PRODUCTION_API_URL = 'https://libspace-backend.onrender.com/api';
+export const PRODUCTION_API_URL = 'https://library-booking-49tt.onrender.com/api';
 
 // On Web: use VITE_API_URL or relative /api. On Native Android: use configured or production backend.
-export const API_BASE_URL =
+const rawUrl =
   storedApiUrl ||
   (import.meta as any).env?.VITE_API_URL ||
   (isNative ? PRODUCTION_API_URL : '/api');
+
+export const API_BASE_URL = (rawUrl || '').trim();
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
