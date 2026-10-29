@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Library } from '../types';
@@ -869,11 +870,11 @@ export const OwnerDashboardPage: React.FC = () => {
                     className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-indigo-700 font-bold bg-slate-100 hover:bg-indigo-50 px-2.5 py-1 rounded-full border border-slate-200 transition cursor-pointer"
                   >
                     <img
-                      src={user.avatar || 'https://api.dicebear.com/7.x/initials/svg?seed=Owner'}
-                      alt={user.name}
+                      src={user?.avatar || 'https://api.dicebear.com/7.x/initials/svg?seed=Owner'}
+                      alt={user?.name || 'Owner'}
                       className="w-4 h-4 rounded-full object-cover"
                     />
-                    <span>Welcome, {user.name}</span>
+                    <span>Welcome, {user?.name || 'Owner'}</span>
                     <span className="text-[10px] text-indigo-700 font-extrabold underline ml-1">Edit Profile</span>
                   </button>
                 </div>
@@ -1827,7 +1828,6 @@ export const OwnerDashboardPage: React.FC = () => {
                                   day: 'numeric',
                                   month: 'short',
                                   year: 'numeric',
-                                daylight: 'short',
                                 })}
                               </span>
                               <span className="text-[11px] text-slate-500 font-semibold flex items-center gap-1">

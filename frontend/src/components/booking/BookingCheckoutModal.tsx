@@ -30,7 +30,7 @@ interface BookingCheckoutModalProps {
   photos?: string[];
 }
 
-const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_THFHFpRR2qfrt7';
+const RAZORPAY_KEY = (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || 'rzp_test_THFHFpRR2qfrt7';
 
 // Dynamically loads Razorpay checkout SDK if not already available
 const loadRazorpayScript = (): Promise<boolean> => {
@@ -92,7 +92,7 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
         notes: {
           libraryName: lockData.seat.libraryName,
           seatNumber: lockData.seat.seatNumber,
-          date: lockData.seat.date || '',
+          date: (lockData.seat as any).date || '',
           lockToken: lockData.lockToken,
         },
         theme: {

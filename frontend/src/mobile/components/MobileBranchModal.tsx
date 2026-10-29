@@ -493,13 +493,14 @@ export const MobileBranchModal: React.FC<MobileBranchModalProps> = ({
               <div className="space-y-1.5">
                 <span className="font-bold text-slate-300">Facilities Available</span>
                 <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
-                  {STANDARD_AMENITIES.map((amenity) => {
-                    const isSelected = selectedFacilities.includes(amenity.name);
+                  {STANDARD_AMENITIES.map((amenity: any) => {
+                    const amenityName = typeof amenity === 'string' ? amenity : amenity.name;
+                    const isSelected = selectedFacilities.includes(amenityName);
                     return (
                       <button
-                        key={amenity.name}
+                        key={amenityName}
                         type="button"
-                        onClick={() => toggleFacility(amenity.name)}
+                        onClick={() => toggleFacility(amenityName)}
                         className={`p-2 rounded-xl border text-left text-[11px] font-semibold flex items-center gap-1.5 transition ${
                           isSelected
                             ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
@@ -515,7 +516,7 @@ export const MobileBranchModal: React.FC<MobileBranchModalProps> = ({
                         >
                           {isSelected && '✓'}
                         </span>
-                        <span className="truncate">{amenity.name}</span>
+                        <span className="truncate">{amenityName}</span>
                       </button>
                     );
                   })}

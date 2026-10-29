@@ -139,8 +139,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setError(err.response?.data?.message);
         toast.error('Your Library Owner account is awaiting Admin approval.');
       } else if (err.response?.data?.roleMismatch) {
-        setError(err.response?.data?.message);
-        toast.error(err.response?.data?.message, { duration: 6000 });
+        const mismatchMsg = err.response?.data?.message || 'Role Mismatch';
+        setError(mismatchMsg);
+        toast.error(mismatchMsg, { duration: 6000 });
+        if (mismatchMsg.includes('ADMIN')) {
+          setTargetRole('ADMIN');
+        } else if (mismatchMsg.includes('OWNER')) {
+          setTargetRole('OWNER');
+        } else if (mismatchMsg.includes('USER')) {
+          setTargetRole('USER');
+        }
       } else {
         const errorMsg = err.response?.data?.message || 'Login failed. Please verify your email and password.';
         setError(errorMsg);
@@ -435,6 +443,57 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             >
               <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
+          </div>
+
+          {/* Quick Role Switcher Tabs */}
+          <div className="px-4 pt-3 sm:px-6 sm:pt-3 flex-shrink-0">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetRole('USER');
+                  setError(null);
+                }}
+                className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                  targetRole === 'USER'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <span>🎓 Student</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetRole('OWNER');
+                  setError(null);
+                }}
+                className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                  targetRole === 'OWNER'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <span>🏢 Owner</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetRole('ADMIN');
+                  setAuthMode('login');
+                  setError(null);
+                }}
+                className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                  targetRole === 'ADMIN'
+                    ? 'bg-purple-700 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <span>🛡️ Admin</span>
+              </button>
+            </div>
           </div>
 
           {/* Segmented Mode Switcher: Sign In vs Create Account (Hidden for Admin & Forgot Pass) */}

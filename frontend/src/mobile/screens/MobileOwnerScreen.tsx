@@ -368,7 +368,7 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({ onOpenAuth
           </div>
 
           <div className="grid grid-cols-4 gap-2">
-            {activeBranch.seats?.map((seat) => (
+            {((activeBranch as any)?.seats || []).map((seat: any) => (
               <button
                 key={seat.id}
                 type="button"

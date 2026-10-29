@@ -120,6 +120,35 @@ export const Navbar: React.FC = () => {
                 </Link>
               )}
 
+              {/* Unauthenticated Quick Portal Access */}
+              {!user && (
+                <>
+                  <Link
+                    to="/owner"
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                      isActive('/owner')
+                        ? 'text-amber-700 bg-amber-50 font-extrabold'
+                        : 'text-slate-600 hover:text-amber-700 hover:bg-amber-50/50'
+                    }`}
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Owner Portal</span>
+                  </Link>
+
+                  <Link
+                    to="/admin"
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                      isActive('/admin')
+                        ? 'text-purple-700 bg-purple-50 font-extrabold'
+                        : 'text-slate-600 hover:text-purple-700 hover:bg-purple-50/50'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Admin Portal</span>
+                  </Link>
+                </>
+              )}
+
               {user?.role === 'USER' && (
                 <Link
                   to="/my-bookings"
@@ -272,6 +301,28 @@ export const Navbar: React.FC = () => {
                   <MapPin className="w-4 h-4 text-blue-600" />
                   Find Libraries
                 </Link>
+              )}
+
+              {!user && (
+                <>
+                  <Link
+                    to="/owner"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-amber-50 font-semibold text-xs text-left"
+                  >
+                    <Building2 className="w-4 h-4 text-amber-600" />
+                    Owner Portal
+                  </Link>
+
+                  <Link
+                    to="/admin"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-purple-50 font-semibold text-xs text-left"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-purple-600" />
+                    Admin Portal
+                  </Link>
+                </>
               )}
 
               {user?.role === 'USER' && (

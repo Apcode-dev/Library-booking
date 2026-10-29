@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { Library, User } from '../types';
@@ -489,11 +490,11 @@ export const AdminDashboardPage: React.FC = () => {
                 className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-purple-700 font-bold bg-slate-100 hover:bg-purple-50 px-2.5 py-1 rounded-full border border-slate-200 transition cursor-pointer"
               >
                 <img
-                  src={user.avatar || 'https://api.dicebear.com/7.x/initials/svg?seed=Admin'}
-                  alt={user.name}
+                  src={user?.avatar || 'https://api.dicebear.com/7.x/initials/svg?seed=Admin'}
+                  alt={user?.name || 'Administrator'}
                   className="w-4 h-4 rounded-full object-cover"
                 />
-                <span>Signed in as {user.name}</span>
+                <span>Signed in as {user?.name || 'Administrator'}</span>
                 <span className="text-[10px] text-purple-600 font-extrabold underline ml-1">Profile</span>
               </button>
             </div>

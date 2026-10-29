@@ -91,6 +91,7 @@ export interface Library {
   totalBookingsCount?: number;
   owner?: { id?: string; name: string; email: string; phone?: string };
   seatZones?: SeatZone[];
+  seats?: any[];
   reviews?: Review[];
 }
 
@@ -161,6 +162,7 @@ export interface Booking {
   seatAmount: number;
   taxAmount: number;
   platformFee: number;
+  totalAmount: number;
   status: 'CONFIRMED' | 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED_NOSHOW';
   bookingType?: 'HOURLY' | 'DAILY' | 'MONTHLY' | 'YEARLY';
   validUntil?: string;
