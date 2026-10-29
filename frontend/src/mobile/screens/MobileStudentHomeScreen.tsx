@@ -15,7 +15,9 @@ import {
   Wifi,
   Navigation,
   CheckCircle,
+  Heart,
 } from 'lucide-react';
+import { getFavoriteIds, toggleFavorite } from '../../lib/favorites';
 
 interface MobileStudentHomeScreenProps {
   onSelectLibrary: (library: Library) => void;
@@ -35,6 +37,19 @@ export const MobileStudentHomeScreen: React.FC<MobileStudentHomeScreenProps> = (
   const [activeCategory, setActiveCategory] = useState<'ALL' | 'HOURLY' | 'PASSES'>('ALL');
   const [isGpsActive, setIsGpsActive] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => getFavoriteIds());
+
+  useEffect(() => {
+    const handleSync = () => setFavoriteIds(getFavoriteIds());
+    window.addEventListener('libspace_favorites_updated', handleSync);
+    return () => window.removeEventListener('libspace_favorites_updated', handleSync);
+  }, []);
+
+  const handleToggleFavorite = (e: React.MouseEvent, libId: string) => {
+    e.stopPropagation();
+    toggleFavorite(libId);
+    setFavoriteIds(getFavoriteIds());
+  };
 
   const fetchLibraries = async (coords = userCoords) => {
     setLoading(true);
@@ -263,17 +278,36 @@ export const MobileStudentHomeScreen: React.FC<MobileStudentHomeScreenProps> = (
 
                   {/* Top Badges: Distance & Rating */}
                   <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
-                    {typeof library.distanceKm === 'number' && (
+                    {typeof library.distanceKm === 'number' ? (
                       <span className="px-2 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md text-[10px] font-black text-blue-400 border border-slate-800 flex items-center gap-1">
                         <MapPin className="w-3 h-3 text-blue-400" />
                         <span>{library.distanceKm.toFixed(1)} km</span>
                       </span>
+                    ) : (
+                      <span></span>
                     )}
 
-                    <span className="px-2 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md text-[10px] font-black text-amber-400 border border-slate-800 flex items-center gap-1 ml-auto">
-                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      <span>{library.rating || '4.8'}</span>
-                    </span>
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md text-[10px] font-black text-amber-400 border border-slate-800 flex items-center gap-1">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        <span>{library.rating || '4.8'}</span>
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleFavorite(e, library.id)}
+                        className="p-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-800 text-rose-500 hover:scale-110 active:scale-90 transition cursor-pointer"
+                        title={favoriteIds.includes(library.id) ? 'Remove Favorite' : 'Add to Favorites'}
+                      >
+                        <Heart
+                          className={`w-3.5 h-3.5 ${
+                            favoriteIds.includes(library.id)
+                              ? 'fill-rose-500 text-rose-500'
+                              : 'text-slate-300'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Bottom Image Overlay: Seats Left */}

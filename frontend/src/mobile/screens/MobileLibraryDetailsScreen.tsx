@@ -16,7 +16,9 @@ import {
   ArrowRight,
   Info,
   ChevronLeft,
+  Heart,
 } from 'lucide-react';
+import { isFavorite, toggleFavorite } from '../../lib/favorites';
 
 interface MobileLibraryDetailsScreenProps {
   library: Library;
@@ -59,6 +61,13 @@ export const MobileLibraryDetailsScreen: React.FC<MobileLibraryDetailsScreenProp
 
   // Active Photo Carousel Tab
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+  const [isFav, setIsFav] = useState(() => isFavorite(library.id));
+
+  const handleToggleFavorite = () => {
+    const updated = toggleFavorite(library.id);
+    setIsFav(updated);
+    toast.success(updated ? 'Saved to Favorites ❤️' : 'Removed from Favorites');
+  };
 
   // Photos
   const photos = [
@@ -158,9 +167,19 @@ export const MobileLibraryDetailsScreen: React.FC<MobileLibraryDetailsScreenProp
         {/* Back Button Floating */}
         <button
           onClick={onBack}
-          className="absolute top-3 left-3 p-2 bg-slate-900/80 hover:bg-slate-900 text-white rounded-xl backdrop-blur-md border border-slate-700/60 shadow-lg active:scale-95 transition"
+          className="absolute top-3 left-3 p-2 bg-slate-900/80 hover:bg-slate-900 text-white rounded-xl backdrop-blur-md border border-slate-700/60 shadow-lg active:scale-95 transition cursor-pointer"
         >
           <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        {/* Favorite Heart Button Floating */}
+        <button
+          type="button"
+          onClick={handleToggleFavorite}
+          className="absolute top-3 right-3 p-2 bg-slate-900/80 hover:bg-slate-900 text-rose-500 rounded-xl backdrop-blur-md border border-slate-700/60 shadow-lg active:scale-90 transition cursor-pointer"
+          title={isFav ? 'Remove Favorite' : 'Save to Favorites'}
+        >
+          <Heart className={`w-5 h-5 ${isFav ? 'fill-rose-500 text-rose-500' : 'text-slate-300'}`} />
         </button>
 
         {/* Photo Thumbnails */}

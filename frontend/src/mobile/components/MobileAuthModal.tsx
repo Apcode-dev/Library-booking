@@ -57,6 +57,13 @@ export const MobileAuthModal: React.FC<MobileAuthModalProps> = ({
   const [resetOtp, setResetOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setRole(initialRole);
+      setMode(initialMode);
+    }
+  }, [isOpen, initialRole, initialMode]);
+
   if (!isOpen) return null;
 
   const handleSendOtp = async () => {
@@ -162,7 +169,15 @@ export const MobileAuthModal: React.FC<MobileAuthModalProps> = ({
         }
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'An unexpected error occurred.');
+      if (err.response?.data?.roleMismatch) {
+        const mismatchMsg = err.response?.data?.message || 'Role Mismatch';
+        toast.error(mismatchMsg, { duration: 5000 });
+        if (mismatchMsg.includes('ADMIN')) setRole('ADMIN');
+        else if (mismatchMsg.includes('OWNER')) setRole('OWNER');
+        else if (mismatchMsg.includes('USER')) setRole('USER');
+      } else {
+        toast.error(err.response?.data?.message || 'An unexpected error occurred.');
+      }
     } finally {
       setLoading(false);
     }
