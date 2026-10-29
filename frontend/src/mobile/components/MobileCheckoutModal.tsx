@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import toast from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { SeatLockResponse } from '../../types';

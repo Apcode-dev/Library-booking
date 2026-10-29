@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import toast from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -261,13 +261,15 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
     }
   };
 
-  // Handle Photo Upload
+  // Handle Photo Upload (Strict 100KB Limit with react-toastify alert)
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 4 * 1024 * 1024) {
-      toast.error('Image exceeds 4MB. Please choose a smaller photo.');
+    const MAX_IMAGE_SIZE = 100 * 1024; // 100KB
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error('Image must be under 100KB');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -278,6 +280,8 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
         const res = await updateProfile({ avatar: dataUrl });
         if (res.success) {
           toast.success('Admin profile photo updated! 📸');
+        } else {
+          toast.error(res.message || 'Failed to save photo.');
         }
       } catch {
         toast.error('Error saving profile photo.');

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import toast from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import api from '../../lib/api';
 import { Lock, X, KeyRound, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 

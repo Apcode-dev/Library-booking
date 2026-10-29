@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import toast from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import api from '../../lib/api';
 import {
   X,

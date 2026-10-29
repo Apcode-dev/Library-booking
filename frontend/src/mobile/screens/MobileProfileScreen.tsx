@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import toast from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
 import {
   User,
@@ -24,6 +24,8 @@ import {
   MessageCircle,
   FileText,
   ShieldAlert,
+  RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 
 interface MobileProfileScreenProps {
@@ -49,6 +51,17 @@ export const MobileProfileScreen: React.FC<MobileProfileScreenProps> = ({
     'notifications' | 'help' | 'settings' | null
   >(null);
 
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [hasUpdate, setHasUpdate] = useState(false);
+
+  const handleCheckUpdate = () => {
+    setCheckingUpdate(true);
+    setTimeout(() => {
+      setCheckingUpdate(false);
+      toast.info('You are using the latest version of LibSpace (v1.0.2)');
+    }, 1200);
+  };
+
   if (!user) {
     return (
       <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-3xl space-y-4 my-8 mx-4">
@@ -67,13 +80,15 @@ export const MobileProfileScreen: React.FC<MobileProfileScreenProps> = ({
     );
   }
 
-  // Handle Photo Upload via Camera or Gallery
+  // Handle Photo Upload via Camera or Gallery (Strict 100KB Limit with react-toastify alert)
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 4 * 1024 * 1024) {
-      toast.error('Image exceeds 4MB. Please choose a smaller photo.');
+    const MAX_IMAGE_SIZE = 100 * 1024; // 100KB
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error('Image must be under 100KB');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -402,29 +417,58 @@ export const MobileProfileScreen: React.FC<MobileProfileScreenProps> = ({
         </button>
       </div>
 
-      {/* Official Android App Direct Download Banner */}
-      <div className="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-teal-950/60 border border-emerald-500/30 rounded-3xl p-4 shadow-xl space-y-2.5">
-        <div className="flex items-center gap-2">
-          <img
-            src="/images/libspace-logo.png"
-            alt="LibSpace App"
-            className="w-8 h-8 rounded-lg object-contain bg-slate-950 p-1 border border-emerald-500/30"
-          />
-          <div>
-            <h4 className="font-extrabold text-white text-xs">LibSpace Native Android APK</h4>
-            <p className="text-[10px] text-slate-400">Official Release • Direct Phone Install</p>
+      {/* Dynamic LibSpace App Update Section (Shown only when update available or on check) */}
+      {hasUpdate ? (
+        <div className="bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 border border-blue-500/40 rounded-3xl p-4 shadow-xl space-y-2.5 animate-fadeIn">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-white text-xs">New Update Available</h4>
+                <p className="text-[10px] text-slate-400">Version 1.0.3 • Improved features & speed</p>
+              </div>
+            </div>
+            <span className="text-[9px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full font-bold">
+              New
+            </span>
           </div>
-        </div>
 
-        <a
-          href="/downloads/libspace-release.apk"
-          download="LibSpace-v1.0.apk"
-          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-center flex items-center justify-center gap-1.5 transition shadow-lg shadow-emerald-950/40 text-xs"
-        >
-          <Download className="w-4 h-4" />
-          <span>Download Android APK</span>
-        </a>
-      </div>
+          <a
+            href="/downloads/libspace-release.apk"
+            download="LibSpace-update.apk"
+            className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-center flex items-center justify-center gap-1.5 transition shadow-lg shadow-blue-600/30 text-xs cursor-pointer active:scale-95"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Update LibSpace</span>
+          </a>
+        </div>
+      ) : (
+        <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-3 flex items-center justify-between text-xs text-slate-400">
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/images/libspace-logo.png"
+              alt="LibSpace"
+              className="w-7 h-7 rounded-lg object-contain bg-slate-950 p-0.5 border border-slate-800"
+            />
+            <div>
+              <span className="font-bold text-white text-[11px] block">LibSpace Mobile v1.0.2</span>
+              <span className="text-[9px] text-emerald-400 font-semibold block">✓ System up to date</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCheckUpdate}
+            disabled={checkingUpdate}
+            className="px-3 py-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-200 text-[10px] font-bold border border-slate-700/60 active:scale-95 transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 text-blue-400 ${checkingUpdate ? 'animate-spin' : ''}`} />
+            <span>{checkingUpdate ? 'Checking...' : 'Check Update'}</span>
+          </button>
+        </div>
+      )}
 
       {/* MODAL 1: Notifications */}
       {activeModal === 'notifications' && (

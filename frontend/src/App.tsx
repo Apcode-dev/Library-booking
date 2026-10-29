@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { App as CapApp } from '@capacitor/app';
 import { AuthProvider } from './context/AuthContext';
 import { isNativeApp } from './lib/platform';
@@ -42,6 +44,26 @@ export const App: React.FC = () => {
 
   return (
     <AuthProvider>
+      <ToastContainer
+        position="top-center"
+        autoClose={3500}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+        toastStyle={{
+          backgroundColor: '#0f172a',
+          color: '#ffffff',
+          borderRadius: '16px',
+          border: '1px solid #1e293b',
+          fontSize: '13px',
+          fontWeight: 600,
+        }}
+      />
       <Toaster
         position="top-center"
         toastOptions={{

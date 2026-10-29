@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
-import toast from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import {
   X,
   Mail,

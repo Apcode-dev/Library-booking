@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import api from '../../lib/api';
 import { Library, SeatZone, Seat, SeatLockResponse } from '../../types';
 import { useAuth } from '../../context/AuthContext';
