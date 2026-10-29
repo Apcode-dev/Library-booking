@@ -173,6 +173,15 @@ export const MobileQRPassModal: React.FC<MobileQRPassModalProps> = ({
                 <span className="text-amber-400 font-bold">Pending Arrival</span>
               )}
             </div>
+
+            {booking.payment?.transactionId && (
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                <span className="text-slate-400">Transaction ID:</span>
+                <span className="font-mono text-emerald-400 font-bold truncate max-w-[170px]">
+                  {booking.payment.transactionId}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons for Active Bookings */}

@@ -549,6 +549,19 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
                   </div>
                 </div>
 
+                {/* Razorpay Transaction ID Verification */}
+                {b.payment?.transactionId && (
+                  <div className="flex items-center justify-between bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-slate-800/80 text-[10px]">
+                    <div className="flex items-center gap-1.5 text-emerald-400 font-mono font-semibold">
+                      <CheckCircle className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                      <span className="truncate max-w-[190px]">TXN: {b.payment.transactionId}</span>
+                    </div>
+                    <span className="text-[9px] font-black uppercase text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded">
+                      Razorpay
+                    </span>
+                  </div>
+                )}
+
                 {/* Timing & Status */}
                 <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] text-slate-400">
                   <span className="flex items-center gap-1">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import toast from 'react-hot-toast';
 import api from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import { SeatLockResponse } from '../../types';
 import {
   X,
@@ -14,6 +15,8 @@ import {
   Lock,
   ArrowRight,
   Info,
+  Sparkles,
+  Zap,
 } from 'lucide-react';
 
 interface MobileCheckoutModalProps {
@@ -24,6 +27,24 @@ interface MobileCheckoutModalProps {
   onSuccess: (booking: any) => void;
 }
 
+const RAZORPAY_KEY =
+  (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || 'rzp_test_THFHFpRR2qfrt7';
+
+// Dynamically loads Razorpay checkout SDK if not already available
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if ((window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
   isOpen,
   onClose,
@@ -31,11 +52,10 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
   photos = [],
   onSuccess,
 }) => {
+  const { user } = useAuth();
   const [secondsRemaining, setSecondsRemaining] = useState(
     lockData?.lockDurationSeconds || 300
   );
-  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'CARD' | 'NET_BANKING'>('UPI');
-  const [upiProvider, setUpiProvider] = useState<'GPAY' | 'PHONEPE' | 'PAYTM'>('GPAY');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 5-minute countdown timer
@@ -69,7 +89,9 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
   const seatAmount = Number(lockData.pricing?.seatAmount ?? 0);
   const taxAmount = Number(lockData.pricing?.taxAmount ?? 0);
   const platformFee = Number(lockData.pricing?.platformFee ?? 0);
-  const totalAmount = Number(lockData.pricing?.totalAmount ?? (seatAmount + taxAmount + platformFee));
+  const totalAmount = Number(
+    lockData.pricing?.totalAmount ?? (seatAmount + taxAmount + platformFee)
+  );
   const durationHours = lockData.pricing?.durationHours ?? 1;
 
   const handleCancelHold = async () => {
@@ -81,40 +103,98 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
     onClose();
   };
 
-  const handleConfirmPayment = async () => {
-    if (!lockData.lockToken) {
+  // Official Razorpay Payment Flow
+  const handleRazorpayPayment = async () => {
+    if (!lockData?.lockToken) {
       toast.error('Session token missing. Please select desk again.');
       onClose();
       return;
     }
 
     setIsSubmitting(true);
-    try {
-      const res = await api.post('/bookings/confirm', {
-        lockToken: lockData.lockToken,
-        paymentMethod,
-      });
-
-      if (res.data.success) {
-        // Fire micro-celebration animation
-        try {
-          confetti({
-            particleCount: 80,
-            spread: 70,
-            origin: { y: 0.6 },
-            colors: ['#3b82f6', '#10b981', '#f59e0b', '#6366f1'],
-          });
-        } catch (_) {}
-
-        toast.success('Desk Reserved Successfully! 🎉');
-        onSuccess(res.data.booking);
-      } else {
-        toast.error(res.data.message || 'Payment confirmation failed.');
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Error processing reservation payment.');
-    } finally {
+    const isLoaded = await loadRazorpayScript();
+    if (!isLoaded) {
+      toast.error('Failed to load Razorpay payment gateway. Please check internet connection.');
       setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const amountInPaise = Math.round(totalAmount * 100);
+
+      const options = {
+        key: RAZORPAY_KEY,
+        amount: amountInPaise,
+        currency: 'INR',
+        name: 'LibSpace Platform',
+        description: `Desk ${seatNumber} Reservation - ${libraryName}`,
+        image: '/images/libspace-logo.png',
+        prefill: {
+          name: user?.name || 'Student Aspirant',
+          email: user?.email || '',
+          contact: user?.phone || '',
+        },
+        notes: {
+          libraryName,
+          seatNumber: String(seatNumber),
+          lockToken: lockData.lockToken,
+          bookingType: lockData.bookingType || 'HOURLY',
+        },
+        theme: {
+          color: '#2563eb', // LibSpace brand blue
+        },
+        modal: {
+          ondismiss: function () {
+            setIsSubmitting(false);
+            toast('Payment cancelled. Your 5-minute hold is still active.', { icon: '⏳' });
+          },
+        },
+        handler: async function (response: any) {
+          toast.loading('Verifying Razorpay payment & generating QR pass...', { id: 'rzp-confirm' });
+          try {
+            const res = await api.post('/bookings/confirm', {
+              lockToken: lockData.lockToken,
+              paymentMethod: 'RAZORPAY',
+              bookingType: lockData.bookingType || 'HOURLY',
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+
+            toast.dismiss('rzp-confirm');
+            if (res.data.success) {
+              try {
+                confetti({
+                  particleCount: 90,
+                  spread: 75,
+                  origin: { y: 0.6 },
+                  colors: ['#3b82f6', '#10b981', '#f59e0b', '#6366f1'],
+                });
+              } catch (_) {}
+
+              toast.success(`Payment Verified! (ID: ${response.razorpay_payment_id}) 🎉`);
+              onSuccess(res.data.booking);
+            } else {
+              toast.error(res.data.message || 'Payment confirmation failed.');
+            }
+          } catch (err: any) {
+            toast.dismiss('rzp-confirm');
+            toast.error(err.response?.data?.message || 'Error confirming booking payment.');
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (resp: any) {
+        setIsSubmitting(false);
+        toast.error(`Payment Failed: ${resp.error?.description || 'Transaction unsuccessful'}`);
+      });
+      rzp.open();
+    } catch (err: any) {
+      setIsSubmitting(false);
+      toast.error('Could not initiate Razorpay checkout.');
     }
   };
 
@@ -215,6 +295,35 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
             )}
           </div>
 
+          {/* Razorpay Verified Badge Banner */}
+          <div className="p-3 bg-gradient-to-r from-blue-950/80 via-slate-950 to-indigo-950/80 rounded-2xl border border-blue-500/30 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4 text-blue-400" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-white">Razorpay Secure Checkout</h4>
+                  <p className="text-[10px] text-blue-300">Official Gateway • 256-Bit Encrypted</p>
+                </div>
+              </div>
+              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-extrabold uppercase">
+                Instant Pass
+              </span>
+            </div>
+
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              Pay securely via UPI (Google Pay, PhonePe, Paytm), Debit/Credit Cards, or Net Banking. You will receive an official Razorpay Transaction ID for verified entry.
+            </p>
+
+            <div className="flex items-center gap-1.5 pt-1 text-[10px] font-bold text-slate-300 border-t border-slate-800/80">
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">Google Pay</span>
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">PhonePe</span>
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">Paytm</span>
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">All Cards</span>
+            </div>
+          </div>
+
           {/* Transparent Price Breakdown */}
           <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2 text-xs">
             <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -244,93 +353,6 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
             </div>
           </div>
 
-          {/* Payment Method Selector */}
-          <div className="space-y-2">
-            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Select Payment Method
-            </label>
-
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('UPI')}
-                className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition cursor-pointer ${
-                  paymentMethod === 'UPI'
-                    ? 'bg-blue-600 text-white border-blue-400 shadow-md'
-                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                }`}
-              >
-                <Smartphone className="w-4 h-4" />
-                <span>UPI Fast</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('CARD')}
-                className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition cursor-pointer ${
-                  paymentMethod === 'CARD'
-                    ? 'bg-blue-600 text-white border-blue-400 shadow-md'
-                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                }`}
-              >
-                <CreditCard className="w-4 h-4" />
-                <span>Card</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaymentMethod('NET_BANKING')}
-                className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition cursor-pointer ${
-                  paymentMethod === 'NET_BANKING'
-                    ? 'bg-blue-600 text-white border-blue-400 shadow-md'
-                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                }`}
-              >
-                <QrCode className="w-4 h-4" />
-                <span>Net Banking</span>
-              </button>
-            </div>
-
-            {/* UPI App Quick Toggles */}
-            {paymentMethod === 'UPI' && (
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-around gap-2 text-[11px] font-bold">
-                <button
-                  type="button"
-                  onClick={() => setUpiProvider('GPAY')}
-                  className={`px-3 py-1.5 rounded-lg border transition cursor-pointer ${
-                    upiProvider === 'GPAY'
-                      ? 'bg-slate-800 text-white border-blue-500'
-                      : 'text-slate-500 border-transparent'
-                  }`}
-                >
-                  Google Pay
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUpiProvider('PHONEPE')}
-                  className={`px-3 py-1.5 rounded-lg border transition cursor-pointer ${
-                    upiProvider === 'PHONEPE'
-                      ? 'bg-slate-800 text-white border-purple-500'
-                      : 'text-slate-500 border-transparent'
-                  }`}
-                >
-                  PhonePe
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUpiProvider('PAYTM')}
-                  className={`px-3 py-1.5 rounded-lg border transition cursor-pointer ${
-                    upiProvider === 'PAYTM'
-                      ? 'bg-slate-800 text-white border-sky-500'
-                      : 'text-slate-500 border-transparent'
-                  }`}
-                >
-                  Paytm UPI
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* Refund Notice Reminder */}
           <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 text-[10px] text-slate-400 flex items-start gap-2">
             <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
@@ -345,18 +367,19 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
         <div className="p-4 border-t border-slate-800 bg-slate-950">
           <button
             type="button"
-            onClick={handleConfirmPayment}
+            onClick={handleRazorpayPayment}
             disabled={isSubmitting}
-            className="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 text-white rounded-2xl text-xs font-bold shadow-xl shadow-emerald-950/40 transition active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            className="w-full py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs font-black shadow-xl shadow-blue-600/30 transition active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
-                <span>Issuing Digital Pass...</span>
+                <span>Connecting to Razorpay...</span>
               </span>
             ) : (
               <>
-                <span>Confirm & Pay ₹{totalAmount.toFixed(2)}</span>
+                <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                <span>Pay ₹{totalAmount.toFixed(2)} via Razorpay</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}

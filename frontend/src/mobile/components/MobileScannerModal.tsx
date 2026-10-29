@@ -36,6 +36,43 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
 
+  const startScanner = async () => {
+    try {
+      setCameraError(null);
+      const scannerId = 'mobile-qr-reader-container';
+      if (html5QrCodeRef.current?.isScanning) {
+        await html5QrCodeRef.current.stop().catch(() => {});
+      }
+      const qrScanner = new Html5Qrcode(scannerId);
+      html5QrCodeRef.current = qrScanner;
+
+      await qrScanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 220, height: 220 },
+        },
+        (decodedText) => {
+          handleVerifyCode(decodedText.trim());
+        },
+        () => {}
+      );
+    } catch (err: any) {
+      setCameraError(
+        'Camera access not available. Please allow camera permissions in App Settings or enter the pass code manually below.'
+      );
+    }
+  };
+
+  const handleRetryCamera = async () => {
+    try {
+      if (navigator.mediaDevices?.getUserMedia) {
+        await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      }
+    } catch (_) {}
+    startScanner();
+  };
+
   useEffect(() => {
     if (!isOpen) {
       if (html5QrCodeRef.current?.isScanning) {
@@ -45,31 +82,6 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
       setCameraError(null);
       return;
     }
-
-    const scannerId = 'mobile-qr-reader-container';
-
-    const startScanner = async () => {
-      try {
-        const qrScanner = new Html5Qrcode(scannerId);
-        html5QrCodeRef.current = qrScanner;
-
-        await qrScanner.start(
-          { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: 220, height: 220 },
-          },
-          (decodedText) => {
-            handleVerifyCode(decodedText.trim());
-          },
-          () => {}
-        );
-      } catch (err: any) {
-        setCameraError(
-          'Camera access not available. Please allow camera permissions or enter the pass code manually below.'
-        );
-      }
-    };
 
     const timer = setTimeout(startScanner, 200);
 
@@ -151,9 +163,16 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
             <div id="mobile-qr-reader-container" className="w-full h-full"></div>
 
             {cameraError && (
-              <div className="absolute inset-0 p-4 bg-slate-950/90 flex flex-col items-center justify-center text-center space-y-2">
+              <div className="absolute inset-0 p-4 bg-slate-950/95 flex flex-col items-center justify-center text-center space-y-2.5 z-10">
                 <AlertTriangle className="w-8 h-8 text-amber-400" />
                 <p className="text-xs text-slate-300 leading-tight">{cameraError}</p>
+                <button
+                  type="button"
+                  onClick={handleRetryCamera}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold active:scale-95 transition shadow-lg shadow-emerald-950/50 cursor-pointer"
+                >
+                  Enable / Retry Camera
+                </button>
               </div>
             )}
           </div>
