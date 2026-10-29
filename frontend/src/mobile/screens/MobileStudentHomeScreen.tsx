@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import api from '../../lib/api';
 import { Library } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 import {
   Search,
   MapPin,
@@ -28,6 +30,7 @@ export const MobileStudentHomeScreen: React.FC<MobileStudentHomeScreenProps> = (
   onSelectLibrary,
   onOpenAuth,
 }) => {
+  const { user } = useAuth();
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,18 +40,29 @@ export const MobileStudentHomeScreen: React.FC<MobileStudentHomeScreenProps> = (
   const [activeCategory, setActiveCategory] = useState<'ALL' | 'HOURLY' | 'PASSES'>('ALL');
   const [isGpsActive, setIsGpsActive] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => getFavoriteIds());
+  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => getFavoriteIds(user?.id));
 
   useEffect(() => {
-    const handleSync = () => setFavoriteIds(getFavoriteIds());
+    const handleSync = () => setFavoriteIds(getFavoriteIds(user?.id));
+    handleSync();
     window.addEventListener('libspace_favorites_updated', handleSync);
     return () => window.removeEventListener('libspace_favorites_updated', handleSync);
-  }, []);
+  }, [user]);
 
   const handleToggleFavorite = (e: React.MouseEvent, libId: string) => {
     e.stopPropagation();
-    toggleFavorite(libId);
-    setFavoriteIds(getFavoriteIds());
+    if (!user) {
+      toast('Please sign in to save your favorite libraries.', { icon: '🔐' });
+      onOpenAuth();
+      return;
+    }
+    const res = toggleFavorite(libId, user.id);
+    if (res.isFav) {
+      toast.success('Saved to Favorites ❤️');
+    } else {
+      toast('Removed from Favorites', { icon: '🗑️' });
+    }
+    setFavoriteIds(getFavoriteIds(user.id));
   };
 
   const fetchLibraries = async (coords = userCoords) => {

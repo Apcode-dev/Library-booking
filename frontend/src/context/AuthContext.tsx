@@ -37,9 +37,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await api.get('/auth/me');
       if (res.data.success) {
         setUser(res.data.user);
+        if (res.data.user?.id) {
+          localStorage.setItem('libspace_user_id', res.data.user.id);
+        }
       }
     } catch (err) {
       localStorage.removeItem('libspace_token');
+      localStorage.removeItem('libspace_user_id');
       setToken(null);
       setUser(null);
     } finally {
@@ -84,8 +88,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = await api.post('/auth/login', { email, password, expectedRole });
     if (res.data.success && res.data.token) {
       localStorage.setItem('libspace_token', res.data.token);
+      if (res.data.user?.id) {
+        localStorage.setItem('libspace_user_id', res.data.user.id);
+      }
       setToken(res.data.token);
       setUser(res.data.user);
+      window.dispatchEvent(new Event('libspace_favorites_updated'));
     }
     return res.data;
   };
@@ -104,8 +112,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = await api.post('/auth/register', data);
     if (res.data.success && res.data.token) {
       localStorage.setItem('libspace_token', res.data.token);
+      if (res.data.user?.id) {
+        localStorage.setItem('libspace_user_id', res.data.user.id);
+      }
       setToken(res.data.token);
       setUser(res.data.user);
+      window.dispatchEvent(new Event('libspace_favorites_updated'));
     }
     return res.data;
   };
@@ -130,8 +142,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     localStorage.removeItem('libspace_token');
+    localStorage.removeItem('libspace_user_id');
     setToken(null);
     setUser(null);
+    window.dispatchEvent(new Event('libspace_favorites_updated'));
   };
 
   return (

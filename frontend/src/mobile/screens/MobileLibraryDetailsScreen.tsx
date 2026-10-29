@@ -61,12 +61,25 @@ export const MobileLibraryDetailsScreen: React.FC<MobileLibraryDetailsScreenProp
 
   // Active Photo Carousel Tab
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
-  const [isFav, setIsFav] = useState(() => isFavorite(library.id));
+  const [isFav, setIsFav] = useState(() => isFavorite(library.id, user?.id));
+
+  useEffect(() => {
+    setIsFav(isFavorite(library.id, user?.id));
+  }, [library.id, user?.id]);
 
   const handleToggleFavorite = () => {
-    const updated = toggleFavorite(library.id);
-    setIsFav(updated);
-    toast.success(updated ? 'Saved to Favorites ❤️' : 'Removed from Favorites');
+    if (!user) {
+      toast('Please sign in to save your favorite libraries.', { icon: '🔐' });
+      onOpenAuth();
+      return;
+    }
+    const res = toggleFavorite(library.id, user.id);
+    setIsFav(res.isFav);
+    if (res.isFav) {
+      toast.success('Saved to Favorites ❤️');
+    } else {
+      toast('Removed from Favorites', { icon: '🗑️' });
+    }
   };
 
   // Photos
@@ -128,18 +141,34 @@ export const MobileLibraryDetailsScreen: React.FC<MobileLibraryDetailsScreenProp
       return;
     }
 
+    let lockStartTime = startTime;
+    let lockEndTime = endTime;
+
+    if (bookingPlan !== 'HOURLY') {
+      const now = new Date();
+      const curHH = String(now.getHours()).padStart(2, '0');
+      const curMM = String(now.getMinutes()).padStart(2, '0');
+      const todayStr = now.toISOString().split('T')[0];
+      if (selectedDate === todayStr) {
+        lockStartTime = `${curHH}:${curMM}`;
+      } else {
+        lockStartTime = library?.openingTime || '07:00';
+      }
+      lockEndTime = library?.closingTime || '23:00';
+    }
+
     setLockLoading(true);
     try {
       const res = await api.post('/bookings/lock', {
         seatId: selectedSeat.id,
         date: selectedDate,
-        startTime,
-        endTime,
+        startTime: lockStartTime,
+        endTime: lockEndTime,
         bookingType: bookingPlan,
       });
 
-      if (res.data.success) {
-        setLockData(res.data);
+      if (res.data.success && res.data.data) {
+        setLockData(res.data.data);
         setIsCheckoutOpen(true);
       } else {
         toast.error(res.data.message || 'Seat is no longer available.');

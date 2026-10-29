@@ -5,6 +5,7 @@ import { Library, UserRole } from '../types';
 import MobileHeader from './components/MobileHeader';
 import MobileBottomNav, { MobileTab } from './components/MobileBottomNav';
 import MobileAuthModal from './components/MobileAuthModal';
+import MobileWelcomeScreen from './screens/MobileWelcomeScreen';
 import MobileStudentHomeScreen from './screens/MobileStudentHomeScreen';
 import MobileLibraryDetailsScreen from './screens/MobileLibraryDetailsScreen';
 import MobilePassesScreen from './screens/MobilePassesScreen';
@@ -19,6 +20,9 @@ export const MobileAppShell: React.FC = () => {
 
   // App Launch Splash Screen State (1.5 seconds)
   const [showSplash, setShowSplash] = useState(true);
+
+  // Welcome Onboarding Screen State (Shown when not logged in)
+  const [hasDismissedWelcome, setHasDismissedWelcome] = useState(false);
 
   // Default activeTab based on user role
   const getInitialTab = (role?: string): MobileTab => {
@@ -42,20 +46,28 @@ export const MobileAppShell: React.FC = () => {
     return () => clearTimeout(splashTimer);
   }, []);
 
-  // Update tab automatically when user signs in or out
+  // Update tab & welcome state automatically when user signs in or out
   useEffect(() => {
     if (user?.role === 'OWNER') {
+      setHasDismissedWelcome(true);
       if (!activeTab.startsWith('owner_')) {
         setActiveTab('owner_dashboard');
       }
     } else if (user?.role === 'ADMIN') {
+      setHasDismissedWelcome(true);
       if (!activeTab.startsWith('admin_')) {
         setActiveTab('admin_dashboard');
       }
-    } else {
+    } else if (user?.role === 'USER') {
+      setHasDismissedWelcome(true);
       if (activeTab.startsWith('owner_') || activeTab.startsWith('admin_')) {
         setActiveTab('explore');
       }
+    } else {
+      // User logged out
+      setHasDismissedWelcome(false);
+      setActiveTab('explore');
+      setSelectedLibrary(null);
     }
   }, [user]);
 
@@ -73,6 +85,9 @@ export const MobileAppShell: React.FC = () => {
           setIsAuthModalOpen(false);
         } else if (selectedLibrary) {
           setSelectedLibrary(null);
+        } else if (!user && hasDismissedWelcome) {
+          // In guest mode, back from explore takes back to welcome gateway
+          setHasDismissedWelcome(false);
         } else if (user?.role === 'OWNER') {
           if (activeTab !== 'owner_dashboard') setActiveTab('owner_dashboard');
           else CapApp.exitApp();
@@ -89,7 +104,7 @@ export const MobileAppShell: React.FC = () => {
     return () => {
       backHandler?.then?.((sub: any) => sub.remove());
     };
-  }, [isAuthModalOpen, selectedLibrary, activeTab, user]);
+  }, [isAuthModalOpen, selectedLibrary, activeTab, user, hasDismissedWelcome]);
 
   // =========================================================================
   // 1. APP OPEN SPLASH SCREEN (Official LibSpace Brand Identity)
@@ -137,7 +152,34 @@ export const MobileAppShell: React.FC = () => {
   }
 
   // =========================================================================
-  // 2. MAIN APP SHELL
+  // 2. WELCOME / ONBOARDING / ROLE LOGIN SCREEN (When not signed in)
+  // =========================================================================
+  if (!user && !hasDismissedWelcome) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+        <MobileWelcomeScreen
+          onSelectRoleLogin={(role) => openAuth(role)}
+          onExploreAsGuest={() => setHasDismissedWelcome(true)}
+        />
+
+        {/* Global Mobile Auth Modal */}
+        <MobileAuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          initialRole={authInitialRole}
+          onSuccess={() => {
+            setHasDismissedWelcome(true);
+            if (authInitialRole === 'OWNER') setActiveTab('owner_dashboard');
+            else if (authInitialRole === 'ADMIN') setActiveTab('admin_dashboard');
+            else setActiveTab('explore');
+          }}
+        />
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // 3. MAIN APP SHELL (Role Isolated Portals)
   // =========================================================================
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
@@ -148,7 +190,7 @@ export const MobileAppShell: React.FC = () => {
             !user ? (
               <button
                 type="button"
-                onClick={() => openAuth('USER')}
+                onClick={() => setHasDismissedWelcome(false)}
                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/30 transition active:scale-95 cursor-pointer"
               >
                 Sign In
@@ -184,6 +226,7 @@ export const MobileAppShell: React.FC = () => {
           <MobileFavoritesScreen
             onSelectLibrary={(lib) => setSelectedLibrary(lib)}
             onExplore={() => setActiveTab('explore')}
+            onOpenAuth={() => openAuth('USER')}
           />
         ) : activeTab === 'profile' ? (
           <MobileProfileScreen
@@ -228,6 +271,7 @@ export const MobileAppShell: React.FC = () => {
         onClose={() => setIsAuthModalOpen(false)}
         initialRole={authInitialRole}
         onSuccess={() => {
+          setHasDismissedWelcome(true);
           // Auto switch to correct portal tab on successful auth
           if (authInitialRole === 'OWNER') setActiveTab('owner_dashboard');
           else if (authInitialRole === 'ADMIN') setActiveTab('admin_dashboard');

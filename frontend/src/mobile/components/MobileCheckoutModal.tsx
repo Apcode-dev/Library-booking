@@ -32,7 +32,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
   onSuccess,
 }) => {
   const [secondsRemaining, setSecondsRemaining] = useState(
-    lockData.lockDurationSeconds || 300
+    lockData?.lockDurationSeconds || 300
   );
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'CARD' | 'NET_BANKING'>('UPI');
   const [upiProvider, setUpiProvider] = useState<'GPAY' | 'PHONEPE' | 'PAYTM'>('GPAY');
@@ -63,14 +63,31 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
   const seconds = secondsRemaining % 60;
   const timeFormatted = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
+  const libraryName = lockData.seat?.libraryName || 'LibSpace Library';
+  const seatNumber = lockData.seat?.seatNumber || 'Standard';
+  const zoneName = lockData.seat?.zoneName || 'Main Hall';
+  const seatAmount = Number(lockData.pricing?.seatAmount ?? 0);
+  const taxAmount = Number(lockData.pricing?.taxAmount ?? 0);
+  const platformFee = Number(lockData.pricing?.platformFee ?? 0);
+  const totalAmount = Number(lockData.pricing?.totalAmount ?? (seatAmount + taxAmount + platformFee));
+  const durationHours = lockData.pricing?.durationHours ?? 1;
+
   const handleCancelHold = async () => {
     try {
-      await api.post('/bookings/release-lock', { lockToken: lockData.lockToken });
+      if (lockData.lockToken) {
+        await api.post('/bookings/release-lock', { lockToken: lockData.lockToken });
+      }
     } catch (_) {}
     onClose();
   };
 
   const handleConfirmPayment = async () => {
+    if (!lockData.lockToken) {
+      toast.error('Session token missing. Please select desk again.');
+      onClose();
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await api.post('/bookings/confirm', {
@@ -152,7 +169,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
           <button
             type="button"
             onClick={handleCancelHold}
-            className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-900/80 text-white hover:bg-slate-900 shadow-md backdrop-blur-sm"
+            className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-900/80 text-white hover:bg-slate-900 shadow-md backdrop-blur-sm cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -176,10 +193,10 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
             <div className="flex items-start justify-between">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
-                  {lockData.seat.libraryName}
+                  {libraryName}
                 </span>
                 <h3 className="text-base font-black text-white">
-                  Desk {lockData.seat.seatNumber} ({lockData.seat.zoneName})
+                  Desk {seatNumber} ({zoneName})
                 </h3>
               </div>
               <span className="px-2.5 py-1 rounded-xl bg-blue-600/20 text-blue-300 border border-blue-500/30 text-[10px] font-extrabold uppercase">
@@ -193,7 +210,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
               </p>
             ) : (
               <p className="text-xs text-slate-400">
-                Duration: <strong>{lockData.pricing.durationHours} Hours</strong> study session
+                Duration: <strong>{durationHours} Hours</strong> study session
               </p>
             )}
           </div>
@@ -206,23 +223,23 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
 
             <div className="flex justify-between text-slate-300">
               <span>Desk Fee</span>
-              <span>₹{lockData.pricing.seatAmount.toFixed(2)}</span>
+              <span>₹{seatAmount.toFixed(2)}</span>
             </div>
 
             <div className="flex justify-between text-slate-300">
               <span>Taxes & GST</span>
-              <span>₹{lockData.pricing.taxAmount.toFixed(2)}</span>
+              <span>₹{taxAmount.toFixed(2)}</span>
             </div>
 
             <div className="flex justify-between text-slate-300">
               <span>Platform & Maintenance</span>
-              <span>₹{lockData.pricing.platformFee.toFixed(2)}</span>
+              <span>₹{platformFee.toFixed(2)}</span>
             </div>
 
             <div className="pt-2 border-t border-slate-800 flex justify-between text-sm font-black text-white">
               <span>Total Payable</span>
               <span className="text-emerald-400">
-                ₹{lockData.pricing.totalAmount.toFixed(2)}
+                ₹{totalAmount.toFixed(2)}
               </span>
             </div>
           </div>
@@ -237,7 +254,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
               <button
                 type="button"
                 onClick={() => setPaymentMethod('UPI')}
-                className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition ${
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition cursor-pointer ${
                   paymentMethod === 'UPI'
                     ? 'bg-blue-600 text-white border-blue-400 shadow-md'
                     : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
@@ -250,7 +267,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
               <button
                 type="button"
                 onClick={() => setPaymentMethod('CARD')}
-                className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition ${
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition cursor-pointer ${
                   paymentMethod === 'CARD'
                     ? 'bg-blue-600 text-white border-blue-400 shadow-md'
                     : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
@@ -263,7 +280,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
               <button
                 type="button"
                 onClick={() => setPaymentMethod('NET_BANKING')}
-                className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition ${
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition cursor-pointer ${
                   paymentMethod === 'NET_BANKING'
                     ? 'bg-blue-600 text-white border-blue-400 shadow-md'
                     : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
@@ -280,7 +297,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setUpiProvider('GPAY')}
-                  className={`px-3 py-1.5 rounded-lg border transition ${
+                  className={`px-3 py-1.5 rounded-lg border transition cursor-pointer ${
                     upiProvider === 'GPAY'
                       ? 'bg-slate-800 text-white border-blue-500'
                       : 'text-slate-500 border-transparent'
@@ -291,7 +308,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setUpiProvider('PHONEPE')}
-                  className={`px-3 py-1.5 rounded-lg border transition ${
+                  className={`px-3 py-1.5 rounded-lg border transition cursor-pointer ${
                     upiProvider === 'PHONEPE'
                       ? 'bg-slate-800 text-white border-purple-500'
                       : 'text-slate-500 border-transparent'
@@ -302,7 +319,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setUpiProvider('PAYTM')}
-                  className={`px-3 py-1.5 rounded-lg border transition ${
+                  className={`px-3 py-1.5 rounded-lg border transition cursor-pointer ${
                     upiProvider === 'PAYTM'
                       ? 'bg-slate-800 text-white border-sky-500'
                       : 'text-slate-500 border-transparent'
@@ -330,7 +347,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
             type="button"
             onClick={handleConfirmPayment}
             disabled={isSubmitting}
-            className="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 text-white rounded-2xl text-xs font-bold shadow-xl shadow-emerald-950/40 transition active:scale-[0.98] flex items-center justify-center gap-2"
+            className="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 text-white rounded-2xl text-xs font-bold shadow-xl shadow-emerald-950/40 transition active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
@@ -339,7 +356,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
               </span>
             ) : (
               <>
-                <span>Confirm & Pay ₹{lockData.pricing.totalAmount.toFixed(2)}</span>
+                <span>Confirm & Pay ₹{totalAmount.toFixed(2)}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
