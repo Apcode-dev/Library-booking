@@ -557,11 +557,36 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
                 {b.payment?.transactionId && (
                   <div className="flex items-center justify-between bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-slate-800/80 text-[10px]">
                     <div className="flex items-center gap-1.5 text-emerald-400 font-mono font-semibold">
-                      <CheckCircle className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0" />
                       <span className="truncate max-w-[190px]">TXN: {b.payment.transactionId}</span>
                     </div>
                     <span className="text-[9px] font-black uppercase text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded">
                       Razorpay
+                    </span>
+                  </div>
+                )}
+
+                {/* 1-Hour Extension Status: Pending vs Completed */}
+                {b.extensionPaymentStatus === 'PENDING' && (
+                  <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/30 px-2.5 py-1.5 rounded-xl text-[10px]">
+                    <div className="flex items-center gap-1.5 text-amber-300 font-bold">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                      <span>+{b.pendingExtensionHours || 1}h Ext. (Payment Pending)</span>
+                    </div>
+                    <span className="font-extrabold text-amber-400">
+                      ₹{b.pendingExtensionAmount || 0} Due
+                    </span>
+                  </div>
+                )}
+
+                {b.extensionPaymentStatus === 'PAID' && (
+                  <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl text-[10px]">
+                    <div className="flex items-center gap-1.5 text-emerald-300 font-bold">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                      <span>+{b.pendingExtensionHours || 1}h Ext. (Payment Completed)</span>
+                    </div>
+                    <span className="font-mono text-emerald-400 text-[9px] font-bold">
+                      {b.extensionPaymentId ? `TXN: ${b.extensionPaymentId.slice(-8)}` : 'PAID'}
                     </span>
                   </div>
                 )}
@@ -1171,23 +1196,6 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
             <p className="text-slate-400 text-xs truncate mt-0.5">{user.email}</p>
             <p className="text-[10px] text-slate-500 mt-0.5">{libraries.length} Branches Managed</p>
           </div>
-        </div>
-
-        {/* Master PIN Status */}
-        <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center justify-between text-[10px]">
-          <div className="flex items-center gap-2 text-slate-300">
-            <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-            <span>
-              <strong>6-Digit Master PIN:</strong> {hasPin ? 'Configured & Active' : 'Not Set'}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsPinModalOpen(true)}
-            className="text-amber-400 font-bold hover:underline"
-          >
-            {hasPin ? 'Change PIN' : 'Set PIN'}
-          </button>
         </div>
       </div>
 

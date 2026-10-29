@@ -199,6 +199,10 @@ model Booking {
   refundAmount       Float?    @default(0)
   refundStatus       String?   // "NONE" | "PROCESSED_30_NOSHOW" | "PROCESSED_50_CANCEL"
   cancellationReason String?
+  pendingExtensionHours   Float?    @default(0)
+  pendingExtensionAmount  Float?    @default(0)
+  extensionPaymentStatus  String?   @default("NONE") // "NONE" | "PENDING" | "PAID"
+  extensionPaymentId      String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

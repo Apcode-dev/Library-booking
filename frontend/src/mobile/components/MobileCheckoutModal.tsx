@@ -198,6 +198,49 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
     }
   };
 
+  // Instant 1-Click Simulation for Test Mode
+  const handleInstantDemoPayment = async () => {
+    if (!lockData?.lockToken) {
+      toast.error('Session token missing. Please select desk again.');
+      onClose();
+      return;
+    }
+
+    setIsSubmitting(true);
+    toast.loading('Simulating Razorpay Test Mode Payment...', { id: 'rzp-demo' });
+    try {
+      const simulatedPaymentId = `pay_test_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
+      const res = await api.post('/bookings/confirm', {
+        lockToken: lockData.lockToken,
+        paymentMethod: 'RAZORPAY_TEST',
+        bookingType: lockData.bookingType || 'HOURLY',
+        razorpayPaymentId: simulatedPaymentId,
+      });
+
+      toast.dismiss('rzp-demo');
+      if (res.data.success) {
+        try {
+          confetti({
+            particleCount: 90,
+            spread: 75,
+            origin: { y: 0.6 },
+            colors: ['#3b82f6', '#10b981', '#f59e0b', '#6366f1'],
+          });
+        } catch (_) {}
+
+        toast.success(`Demo Payment Confirmed! (${simulatedPaymentId}) 🎉`);
+        onSuccess(res.data.booking);
+      } else {
+        toast.error(res.data.message || 'Demo payment confirmation failed.');
+      }
+    } catch (err: any) {
+      toast.dismiss('rzp-demo');
+      toast.error(err.response?.data?.message || 'Error processing demo test payment.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // 3-Image showcase collage
   const collagePhotos = [
     photos[0] || 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=800',
@@ -361,15 +404,26 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
               completion; 30% auto-refund if you are unable to check in.
             </span>
           </div>
+
+          {/* Razorpay Test Mode Demo Helper Banner */}
+          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[10px] space-y-1">
+            <div className="flex items-center gap-1.5 text-amber-300 font-bold">
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span>Razorpay Sandbox Demo Mode</span>
+            </div>
+            <p className="text-slate-300 text-[10px] leading-relaxed">
+              In test mode, you can test via Razorpay Checkout (Card: <code className="text-amber-300 bg-slate-900 px-1 rounded">4111 1111 1111 1111</code>, OTP: <code className="text-amber-300 bg-slate-900 px-1 rounded">123456</code>, or UPI: <code className="text-amber-300 bg-slate-900 px-1 rounded">success@razorpay</code>) or use the instant demo button below.
+            </p>
+          </div>
         </div>
 
-        {/* Modal Footer / Action Button */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950">
+        {/* Modal Footer / Action Buttons */}
+        <div className="p-4 border-t border-slate-800 bg-slate-950 space-y-2">
           <button
             type="button"
             onClick={handleRazorpayPayment}
             disabled={isSubmitting}
-            className="w-full py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs font-black shadow-xl shadow-blue-600/30 transition active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            className="w-full py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl text-xs font-black shadow-xl shadow-blue-600/30 transition active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
@@ -383,6 +437,17 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
+          </button>
+
+          {/* Instant 1-Click Demo Payment Button */}
+          <button
+            type="button"
+            onClick={handleInstantDemoPayment}
+            disabled={isSubmitting}
+            className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-amber-300 rounded-xl text-xs font-bold transition active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>🧪 Instant Demo Pay (1-Click Test Simulation)</span>
           </button>
         </div>
       </div>

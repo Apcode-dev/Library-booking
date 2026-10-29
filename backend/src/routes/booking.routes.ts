@@ -23,5 +23,6 @@ router.get('/:id/attendance', BookingController.getBookingAttendance);
 router.get('/:id', BookingController.getBookingById);
 router.post('/:id/cancel', BookingController.cancelBooking);
 router.post('/:id/extend', BookingController.extendBooking);
+router.post('/:id/pay-extension', BookingController.payExtension);
 
 export default router;

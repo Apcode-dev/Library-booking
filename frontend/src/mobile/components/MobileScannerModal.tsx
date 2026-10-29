@@ -73,6 +73,23 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
     startScanner();
   };
 
+  const handleSafeClose = async () => {
+    try {
+      if (html5QrCodeRef.current) {
+        if (html5QrCodeRef.current.isScanning) {
+          await html5QrCodeRef.current.stop().catch(() => {});
+        }
+        await html5QrCodeRef.current.clear().catch(() => {});
+      }
+    } catch (_) {
+    } finally {
+      html5QrCodeRef.current = null;
+      setVerifiedBooking(null);
+      setCameraError(null);
+      onClose();
+    }
+  };
+
   useEffect(() => {
     if (!isOpen) {
       if (html5QrCodeRef.current?.isScanning) {
@@ -149,8 +166,9 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
             <h3 className="text-sm font-extrabold text-white">Live Gate Scanner</h3>
           </div>
           <button
-            onClick={onClose}
-            className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white"
+            type="button"
+            onClick={handleSafeClose}
+            className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white cursor-pointer active:scale-95 transition"
           >
             <X className="w-4 h-4" />
           </button>

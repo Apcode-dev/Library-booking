@@ -93,7 +93,9 @@ export const App: React.FC = () => {
       />
       {/* If running inside Native Android App shell or mobile preview mode, render dedicated Mobile Experience */}
       {isMobileMode ? (
-        <MobileAppShell />
+        <ErrorBoundary>
+          <MobileAppShell />
+        </ErrorBoundary>
       ) : (
         /* Otherwise render the existing standard Web application */
         <BrowserRouter>

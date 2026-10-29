@@ -594,6 +594,7 @@ export class BookingController {
       const newQrCode = await generateQRCodeDataURL(qrPayload);
 
       // Execute update atomically
+      const isPaidNow = Boolean(razorpayPaymentId);
       const updatedBooking = await prisma.$transaction(async (tx) => {
         const b = await tx.booking.update({
           where: { id: booking.id },
@@ -604,6 +605,10 @@ export class BookingController {
             seatAmount: parseFloat((booking.seatAmount + additionalSeatAmount).toFixed(2)),
             taxAmount: parseFloat((booking.taxAmount + additionalTax).toFixed(2)),
             totalAmount: parseFloat((booking.totalAmount + additionalTotal).toFixed(2)),
+            pendingExtensionHours: isPaidNow ? (booking.pendingExtensionHours || 0) : ((booking.pendingExtensionHours || 0) + hoursToAdd),
+            pendingExtensionAmount: isPaidNow ? 0 : ((booking.pendingExtensionAmount || 0) + additionalTotal),
+            extensionPaymentStatus: isPaidNow ? 'PAID' : 'PENDING',
+            extensionPaymentId: razorpayPaymentId || booking.extensionPaymentId || null,
             qrCode: newQrCode,
           },
           include: {
@@ -634,10 +639,63 @@ export class BookingController {
           additionalAmount: additionalTotal,
           newEndTime: newEndTimeStr,
           newEndDateTime,
+          extensionPaymentStatus: isPaidNow ? 'PAID' : 'PENDING',
         },
       });
     } catch (error: any) {
       res.status(500).json({ success: false, message: 'Failed to extend seat time', error: error.message });
+    }
+  }
+
+  /**
+   * Pay pending extension fee for an active booking pass
+   */
+  static async payExtension(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { razorpayPaymentId, paymentMethod = 'RAZORPAY' } = req.body;
+      const userId = req.user!.id;
+
+      if (!razorpayPaymentId) {
+        res.status(400).json({ success: false, message: 'Payment transaction reference required.' });
+        return;
+      }
+
+      const booking = await prisma.booking.findUnique({
+        where: { id },
+        include: { payment: true },
+      });
+
+      if (!booking) {
+        res.status(404).json({ success: false, message: 'Booking not found.' });
+        return;
+      }
+
+      if (booking.userId !== userId && req.user!.role !== 'ADMIN') {
+        res.status(403).json({ success: false, message: 'Unauthorized.' });
+        return;
+      }
+
+      const updatedBooking = await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          extensionPaymentStatus: 'PAID',
+          extensionPaymentId: razorpayPaymentId,
+        },
+        include: {
+          library: true,
+          seat: { include: { seatZone: true } },
+          payment: true,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: 'Extension payment confirmed successfully! ✅',
+        booking: updatedBooking,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to record extension payment', error: error.message });
     }
   }
 
