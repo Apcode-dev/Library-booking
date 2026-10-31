@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
+import { compressProfileImage } from '../../lib/imageCompressor';
 import {
   User,
   Mail,
@@ -80,34 +81,30 @@ export const MobileProfileScreen: React.FC<MobileProfileScreenProps> = ({
     );
   }
 
-  // Handle Photo Upload via Camera or Gallery (Strict 100KB Limit with react-toastify alert)
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Photo Upload via Camera or Gallery with Auto Compression (<80KB)
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const MAX_IMAGE_SIZE = 100 * 1024; // 100KB
-    if (file.size > MAX_IMAGE_SIZE) {
-      toast.error('Image must be under 100KB');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async (uploadEvent) => {
-      const dataUrl = uploadEvent.target?.result as string;
+    try {
+      toast.loading('Processing & optimizing photo...', { id: 'photo-upload' });
+      const dataUrl = await compressProfileImage(file, 400, 0.75);
       setAvatar(dataUrl);
-      try {
-        const res = await updateProfile({ avatar: dataUrl });
-        if (res.success) {
-          toast.success('Profile photo updated! 📸');
-        } else {
-          toast.error(res.message || 'Failed to save photo.');
-        }
-      } catch {
-        toast.error('Error saving profile photo.');
+
+      const res = await updateProfile({ avatar: dataUrl });
+      toast.dismiss('photo-upload');
+
+      if (res.success) {
+        toast.success('Profile photo updated! 📸');
+      } else {
+        toast.error(res.message || 'Failed to save photo.');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      toast.dismiss('photo-upload');
+      toast.error(err.message || 'Error saving profile photo.');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleUpdate = async () => {

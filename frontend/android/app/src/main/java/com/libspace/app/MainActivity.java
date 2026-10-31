@@ -3,6 +3,7 @@ package com.libspace.app;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.webkit.WebSettings;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
@@ -22,6 +23,15 @@ public class MainActivity extends BridgeActivity {
                 new String[]{Manifest.permission.CAMERA},
                 CAMERA_REQUEST_CODE
             );
+        }
+
+        // Enable popup windows and multi-window for Razorpay NetBanking and bank auth flows
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            WebSettings webSettings = getBridge().getWebView().getSettings();
+            webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
+            webSettings.setSupportMultipleWindows(true);
+            webSettings.setDomStorageEnabled(true);
+            webSettings.setDatabaseEnabled(true);
         }
     }
 }

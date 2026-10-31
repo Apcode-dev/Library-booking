@@ -50,15 +50,21 @@ export const MobileQRPassModal: React.FC<MobileQRPassModalProps> = ({
   const [extending, setExtending] = useState(false);
   const [payingExtension, setPayingExtension] = useState(false);
 
+  React.useEffect(() => {
+    setBooking(initialBooking);
+  }, [initialBooking]);
+
   if (!booking) return null;
 
   const isCheckedIn = Boolean(booking.checkInTime);
   const isCancelled = booking.status === 'CANCELLED';
   const isCompleted = booking.status === 'COMPLETED' || booking.status === 'EXPIRED_NOSHOW';
   const isActive = booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN';
-  const isExtensionPending = booking.extensionPaymentStatus === 'PENDING';
+  const isExtensionPending =
+    booking.extensionPaymentStatus === 'PENDING' ||
+    (Number(booking.pendingExtensionHours) > 0 && booking.extensionPaymentStatus !== 'PAID');
   const isExtensionPaid = booking.extensionPaymentStatus === 'PAID';
-  const pendingAmount = Number(booking.pendingExtensionAmount || booking.hourlyRate || 50);
+  const pendingAmount = Number(booking.pendingExtensionAmount || booking.hourlyRate || 20);
 
   const handleCancel = async () => {
     if (!window.confirm('Are you sure you want to cancel? You will receive an immediate 50% refund.')) {
@@ -104,30 +110,7 @@ export const MobileQRPassModal: React.FC<MobileQRPassModalProps> = ({
     }
   };
 
-  const handlePayExtension = async (useSimulation = false) => {
-    if (useSimulation) {
-      setPayingExtension(true);
-      const simulatedId = `pay_test_ext_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
-      try {
-        const res = await api.post(`/bookings/${booking.id}/pay-extension`, {
-          razorpayPaymentId: simulatedId,
-        });
-        if (res.data.success) {
-          toast.success('1-Hour Extension Payment Completed! ✅');
-          setBooking(res.data.booking);
-          onBookingUpdated?.();
-        } else {
-          toast.error(res.data.message || 'Payment recording failed.');
-        }
-      } catch (err: any) {
-        toast.error(err.response?.data?.message || 'Error confirming extension payment.');
-      } finally {
-        setPayingExtension(false);
-      }
-      return;
-    }
-
-    // Razorpay standard checkout
+  const handlePayExtension = async () => {
     setPayingExtension(true);
     const isLoaded = await loadRazorpayScript();
     if (!isLoaded) {
@@ -143,6 +126,7 @@ export const MobileQRPassModal: React.FC<MobileQRPassModalProps> = ({
         currency: 'INR',
         name: 'LibSpace 1-Hour Extension',
         description: `Desk ${booking.seat?.seatNumber} 1hr Extension`,
+        image: 'https://cdn-icons-png.flaticon.com/512/2232/2232688.png',
         prefill: {
           name: booking.user?.name || '',
           email: booking.user?.email || '',
@@ -297,25 +281,15 @@ export const MobileQRPassModal: React.FC<MobileQRPassModalProps> = ({
                 Your study session has been reserved until <strong className="text-white">{booking.endTime}</strong>. Please complete the pending extension payment.
               </p>
 
-              <div className="space-y-1.5 pt-1">
+              <div className="pt-1">
                 <button
                   type="button"
-                  onClick={() => handlePayExtension(false)}
+                  onClick={() => handlePayExtension()}
                   disabled={payingExtension}
-                  className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-lg transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-lg transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   <CreditCard className="w-3.5 h-3.5" />
-                  <span>Pay ₹{pendingAmount} (Razorpay)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handlePayExtension(true)}
-                  disabled={payingExtension}
-                  className="w-full py-2 bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 rounded-xl text-[11px] font-bold transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>🧪 Demo Pay ₹{pendingAmount} (1-Click Test Mode)</span>
+                  <span>Pay ₹{pendingAmount} via Razorpay</span>
                 </button>
               </div>
             </div>

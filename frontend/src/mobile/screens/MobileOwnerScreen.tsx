@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { Library, User } from '../../types';
+import { compressProfileImage } from '../../lib/imageCompressor';
 import MobileScannerModal from '../components/MobileScannerModal';
 import MobileBranchModal from '../components/MobileBranchModal';
 import MobileSecurityPinModal from '../components/MobileSecurityPinModal';
@@ -248,32 +249,29 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Photo Upload with Auto Compression (<80KB)
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const MAX_IMAGE_SIZE = 100 * 1024; // 100KB
-    if (file.size > MAX_IMAGE_SIZE) {
-      toast.error('Image must be under 100KB');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
+    try {
+      toast.loading('Optimizing partner photo...', { id: 'owner-photo' });
+      const dataUrl = await compressProfileImage(file, 400, 0.75);
 
-    const reader = new FileReader();
-    reader.onload = async (uploadEvent) => {
-      const dataUrl = uploadEvent.target?.result as string;
-      try {
-        const res = await updateProfile({ avatar: dataUrl });
-        if (res.success) {
-          toast.success('Owner profile photo updated! 📸');
-        } else {
-          toast.error(res.message || 'Failed to save photo.');
-        }
-      } catch {
-        toast.error('Error saving profile photo.');
+      const res = await updateProfile({ avatar: dataUrl });
+      toast.dismiss('owner-photo');
+
+      if (res.success) {
+        toast.success('Owner profile photo updated! 📸');
+      } else {
+        toast.error(res.message || 'Failed to save photo.');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      toast.dismiss('owner-photo');
+      toast.error(err.message || 'Error saving profile photo.');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   if (!user || (user.role !== 'OWNER' && user.role !== 'ADMIN')) {
@@ -567,14 +565,14 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
                 )}
 
                 {/* 1-Hour Extension Status: Pending vs Completed */}
-                {b.extensionPaymentStatus === 'PENDING' && (
+                {(b.extensionPaymentStatus === 'PENDING' || (Number(b.pendingExtensionHours) > 0 && b.extensionPaymentStatus !== 'PAID')) && (
                   <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/30 px-2.5 py-1.5 rounded-xl text-[10px]">
                     <div className="flex items-center gap-1.5 text-amber-300 font-bold">
                       <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
                       <span>+{b.pendingExtensionHours || 1}h Ext. (Payment Pending)</span>
                     </div>
                     <span className="font-extrabold text-amber-400">
-                      ₹{b.pendingExtensionAmount || 0} Due
+                      ₹{b.pendingExtensionAmount || 20} Due
                     </span>
                   </div>
                 )}

@@ -183,18 +183,18 @@ export const MobilePassesScreen: React.FC<MobilePassesScreenProps> = ({
                 </div>
 
                 {/* 1-Hour Extension Status: Pending vs Completed */}
-                {b.extensionPaymentStatus === 'PENDING' && (
+                {(b.extensionPaymentStatus === 'PENDING' || (Number(b.pendingExtensionHours) > 0 && b.extensionPaymentStatus !== 'PAID')) && (
                   <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 text-amber-300 font-bold">
                       <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                      <span>+1hr Ext. (Payment Due)</span>
+                      <span>+{b.pendingExtensionHours || 1}hr Ext. (Payment Due)</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setSelectedBookingForPass(b)}
                       className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black tracking-wide cursor-pointer transition active:scale-95 shadow-md shadow-amber-500/20"
                     >
-                      Pay ₹{b.pendingExtensionAmount || b.hourlyRate || 50}
+                      Pay ₹{b.pendingExtensionAmount || b.hourlyRate || 20}
                     </button>
                   </div>
                 )}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import { compressProfileImage } from '../../lib/imageCompressor';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -261,33 +262,29 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
     }
   };
 
-  // Handle Photo Upload (Strict 100KB Limit with react-toastify alert)
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Photo Upload with Auto Compression (<80KB)
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const MAX_IMAGE_SIZE = 100 * 1024; // 100KB
-    if (file.size > MAX_IMAGE_SIZE) {
-      toast.error('Image must be under 100KB');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
+    try {
+      toast.loading('Optimizing admin photo...', { id: 'admin-photo' });
+      const dataUrl = await compressProfileImage(file, 400, 0.75);
 
-    const reader = new FileReader();
-    reader.onload = async (uploadEvent) => {
-      const dataUrl = uploadEvent.target?.result as string;
-      try {
-        const res = await updateProfile({ avatar: dataUrl });
-        if (res.success) {
-          toast.success('Admin profile photo updated! 📸');
-        } else {
-          toast.error(res.message || 'Failed to save photo.');
-        }
-      } catch {
-        toast.error('Error saving profile photo.');
+      const res = await updateProfile({ avatar: dataUrl });
+      toast.dismiss('admin-photo');
+
+      if (res.success) {
+        toast.success('Admin profile photo updated! 📸');
+      } else {
+        toast.error(res.message || 'Failed to save photo.');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      toast.dismiss('admin-photo');
+      toast.error(err.message || 'Error saving profile photo.');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   if (!user || user.role !== 'ADMIN') {
