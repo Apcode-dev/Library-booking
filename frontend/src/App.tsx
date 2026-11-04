@@ -15,6 +15,7 @@ import MyBookingsPage from './pages/MyBookingsPage';
 import OwnerDashboardPage from './pages/OwnerDashboardPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import MandatoryProfileModal from './components/common/MandatoryProfileModal';
 
 export const App: React.FC = () => {
   const [isMobileMode, setIsMobileMode] = useState<boolean>(() => isNativeApp());
@@ -44,6 +45,7 @@ export const App: React.FC = () => {
 
   return (
     <AuthProvider>
+      <MandatoryProfileModal />
       <ToastContainer
         position="top-center"
         autoClose={3500}

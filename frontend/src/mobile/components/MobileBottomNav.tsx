@@ -26,6 +26,12 @@ export type MobileTab =
   | 'owner_branches'
   | 'owner_attendance'
   | 'owner_profile'
+  // Manager Tabs
+  | 'manager_dashboard'
+  | 'manager_bookings'
+  | 'manager_attendance'
+  | 'manager_users'
+  | 'manager_profile'
   // Admin Tabs
   | 'admin_dashboard'
   | 'admin_state_admins'
@@ -51,9 +57,56 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   // Role Detection
   const isOwner = user?.role === 'OWNER';
+  const isManager = user?.role === 'MANAGER';
   const isAdmin = user?.role === 'ADMIN';
   const isSubAdmin = isAdmin && user?.adminType === 'SUB_ADMIN';
   const isMasterAdmin = isAdmin && !isSubAdmin;
+
+  // ----------------------------------------------------
+  // 0. MANAGER NAVIGATION BAR (5 TABS)
+  // ----------------------------------------------------
+  if (isManager) {
+    const managerTabs: Array<{ id: MobileTab; label: string; icon: any }> = [
+      { id: 'manager_dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'manager_bookings', label: 'Bookings', icon: CalendarCheck },
+      { id: 'manager_attendance', label: 'Attendance', icon: QrCode },
+      { id: 'manager_users', label: 'Users', icon: Users },
+      { id: 'manager_profile', label: 'Profile', icon: User },
+    ];
+
+    return (
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800/80 px-2 py-1.5 shadow-2xl safe-area-pb">
+        <div className="max-w-md mx-auto grid grid-cols-5 gap-1 text-center">
+          {managerTabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => onSelectTab(tab.id)}
+                className={`flex flex-col items-center justify-center py-1 px-1 rounded-2xl transition active:scale-95 cursor-pointer relative ${
+                  isActive
+                    ? 'text-emerald-400 font-bold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <div
+                  className={`p-1.5 rounded-xl transition ${
+                    isActive ? 'bg-emerald-500/20 text-emerald-400 shadow-sm' : ''
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] mt-0.5 tracking-tight">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    );
+  }
 
   // ----------------------------------------------------
   // 1. OWNER NAVIGATION BAR (5 TABS)

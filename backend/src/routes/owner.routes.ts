@@ -31,4 +31,9 @@ router.post('/security-pin/verify', OwnerController.verifySecurityPin);
 router.post('/security-pin/forgot', OwnerController.forgotSecurityPin);
 router.post('/security-pin/reset', OwnerController.resetSecurityPin);
 
+// Library Managers Management (Appointed by Owner)
+router.get('/managers', OwnerController.getManagers);
+router.post('/managers', OwnerController.createManager);
+router.delete('/managers/:id', OwnerController.deleteManager);
+
 export default router;

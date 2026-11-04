@@ -12,6 +12,7 @@ import MobilePassesScreen from './screens/MobilePassesScreen';
 import MobileFavoritesScreen from './screens/MobileFavoritesScreen';
 import MobileOwnerScreen from './screens/MobileOwnerScreen';
 import MobileAdminScreen from './screens/MobileAdminScreen';
+import MobileManagerScreen from './screens/MobileManagerScreen';
 import MobileProfileScreen from './screens/MobileProfileScreen';
 import { Sparkles, Building2, ShieldCheck, User as UserIcon } from 'lucide-react';
 
@@ -26,6 +27,7 @@ export const MobileAppShell: React.FC = () => {
 
   // Default activeTab based on user role
   const getInitialTab = (role?: string): MobileTab => {
+    if (role === 'MANAGER') return 'manager_dashboard';
     if (role === 'OWNER') return 'owner_dashboard';
     if (role === 'ADMIN') return 'admin_dashboard';
     return 'explore';
@@ -48,7 +50,12 @@ export const MobileAppShell: React.FC = () => {
 
   // Update tab & welcome state automatically when user signs in or out
   useEffect(() => {
-    if (user?.role === 'OWNER') {
+    if (user?.role === 'MANAGER') {
+      setHasDismissedWelcome(true);
+      if (!activeTab.startsWith('manager_')) {
+        setActiveTab('manager_dashboard');
+      }
+    } else if (user?.role === 'OWNER') {
       setHasDismissedWelcome(true);
       if (!activeTab.startsWith('owner_')) {
         setActiveTab('owner_dashboard');
@@ -60,7 +67,7 @@ export const MobileAppShell: React.FC = () => {
       }
     } else if (user?.role === 'USER') {
       setHasDismissedWelcome(true);
-      if (activeTab.startsWith('owner_') || activeTab.startsWith('admin_')) {
+      if (activeTab.startsWith('owner_') || activeTab.startsWith('admin_') || activeTab.startsWith('manager_')) {
         setActiveTab('explore');
       }
     } else {
@@ -232,6 +239,12 @@ export const MobileAppShell: React.FC = () => {
           <MobileProfileScreen
             onOpenAuth={() => openAuth('USER')}
             onNavigateTab={(tab) => setActiveTab(tab)}
+          />
+        ) : activeTab.startsWith('manager_') ? (
+          <MobileManagerScreen
+            activeTab={activeTab}
+            onNavigateTab={(tab) => setActiveTab(tab as MobileTab)}
+            onOpenAuth={() => openAuth('OWNER')}
           />
         ) : activeTab.startsWith('owner_') ? (
           <MobileOwnerScreen

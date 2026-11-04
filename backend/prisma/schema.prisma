@@ -31,6 +31,13 @@ model User {
   pinResetExpiresAt DateTime? // Validity window for PIN reset OTP
   adminType    String?    @default("MASTER_ADMIN") // "MASTER_ADMIN" | "SUB_ADMIN"
   assignedState String?   // State managed by Sub-Admin e.g. "Uttar Pradesh"
+  studentId    String?    @unique // Unique Library Student ID e.g. "LIB-STU-10294"
+  state        String?    // User residence / state
+  city         String?    // User city
+  isProfileComplete Boolean @default(false) // Mandatory profile completion flag
+  assignedLibraryId String? // For role === 'MANAGER'
+  assignedLibrary   Library? @relation("LibraryManagers", fields: [assignedLibraryId], references: [id], onDelete: SetNull)
+  createdById  String?    // Owner who appointed this manager
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -108,6 +115,7 @@ model Library {
   bookings        Booking[]
   reviews         Review[]
   attendances     Attendance[]
+  managers        User[]      @relation("LibraryManagers")
 
   @@index([city])
   @@index([state])

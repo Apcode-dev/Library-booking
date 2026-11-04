@@ -15,7 +15,7 @@ interface AuthContextType {
   resetPassword: (email: string, otp: string, newPassword: string) => Promise<any>;
   logout: () => void;
   refreshUser: () => Promise<void>;
-  updateProfile: (data: { name?: string; phone?: string; avatar?: string }) => Promise<any>;
+  updateProfile: (data: { name?: string; phone?: string; avatar?: string; state?: string; city?: string }) => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -132,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return res.data;
   };
 
-  const updateProfile = async (data: { name?: string; phone?: string; avatar?: string }) => {
+  const updateProfile = async (data: { name?: string; phone?: string; avatar?: string; state?: string; city?: string }) => {
     const res = await api.patch('/auth/profile', data);
     if (res.data.success && res.data.user) {
       setUser(res.data.user);

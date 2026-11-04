@@ -9,10 +9,11 @@ declare global {
       user?: {
         id: string;
         email: string;
-        role: 'USER' | 'OWNER' | 'ADMIN';
+        role: 'USER' | 'OWNER' | 'ADMIN' | 'MANAGER' | string;
         name: string;
         adminType?: string | null;
         assignedState?: string | null;
+        assignedLibraryId?: string | null;
       };
     }
   }
@@ -42,7 +43,7 @@ export const authenticateUser = async (
 
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, email: true, role: true, name: true, activeToken: true, adminType: true, assignedState: true },
+      select: { id: true, email: true, role: true, name: true, activeToken: true, adminType: true, assignedState: true, assignedLibraryId: true },
     });
 
     if (!user) {
@@ -63,14 +64,7 @@ export const authenticateUser = async (
       return;
     }
 
-    req.user = user as {
-      id: string;
-      email: string;
-      role: 'USER' | 'OWNER' | 'ADMIN';
-      name: string;
-      adminType?: string | null;
-      assignedState?: string | null;
-    };
+    req.user = user as any;
 
     next();
   } catch (error: any) {
@@ -114,7 +108,7 @@ export const optionalAuth = async (
  * RBAC Role Authorization Guard:
  * Restricts route access to specific roles ('USER', 'OWNER', 'ADMIN').
  */
-export const authorizeRoles = (...allowedRoles: ('USER' | 'OWNER' | 'ADMIN')[]) => {
+export const authorizeRoles = (...allowedRoles: ('USER' | 'OWNER' | 'ADMIN' | 'MANAGER' | string)[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({

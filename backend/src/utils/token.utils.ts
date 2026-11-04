@@ -4,7 +4,7 @@ import { ENV } from '../config/env';
 export interface TokenPayload {
   userId: string;
   email: string;
-  role: 'USER' | 'OWNER' | 'ADMIN';
+  role: 'USER' | 'OWNER' | 'ADMIN' | 'MANAGER' | string;
 }
 
 export const generateToken = (payload: TokenPayload): string => {

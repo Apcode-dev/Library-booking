@@ -7,6 +7,7 @@ import { compressProfileImage } from '../../lib/imageCompressor';
 import MobileScannerModal from '../components/MobileScannerModal';
 import MobileBranchModal from '../components/MobileBranchModal';
 import MobileSecurityPinModal from '../components/MobileSecurityPinModal';
+import MobileOwnerManagersModal from '../components/MobileOwnerManagersModal';
 import {
   Building2,
   Lock,
@@ -63,9 +64,10 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pinTargetBranch, setPinTargetBranch] = useState<Library | null>(null);
 
-  // Scanner modal & Add branch modal
+  // Scanner modal & Add branch modal & Managers modal
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isAddBranchOpen, setIsAddBranchOpen] = useState(false);
+  const [isManagersModalOpen, setIsManagersModalOpen] = useState(false);
 
   // Branch Console Detailed View (when a branch is unlocked and selected)
   const [selectedBranch, setSelectedBranch] = useState<Library | null>(null);
@@ -1240,6 +1242,26 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
           <ChevronRight className="w-4 h-4 text-slate-600" />
         </button>
 
+        {/* Library Managers Management */}
+        <button
+          type="button"
+          onClick={() => setIsManagersModalOpen(true)}
+          className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-800/50 transition cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <Users className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-bold text-white block">Library Managers</span>
+              <span className="text-[10px] text-slate-400">
+                Appoint managers & assign library branch (1 Manager = 1 Library)
+              </span>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-slate-600" />
+        </button>
+
         <button
           type="button"
           onClick={() => setIsPinModalOpen(true)}
@@ -1293,6 +1315,13 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
           setIsPinModalOpen(false);
           toast.success('Security PIN verified / configured! 🔒');
         }}
+      />
+
+      {/* Library Managers Modal */}
+      <MobileOwnerManagersModal
+        isOpen={isManagersModalOpen}
+        onClose={() => setIsManagersModalOpen(false)}
+        libraries={libraries}
       />
     </div>
   );

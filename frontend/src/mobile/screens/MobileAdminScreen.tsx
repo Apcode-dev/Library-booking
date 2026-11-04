@@ -130,16 +130,22 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
     fetchAdminData();
   }, [user]);
 
-  // Approvals Filter (Pending or Forwarded)
+  // Approvals Filter (Strict One-Time Approval & Removal on Forward)
   const approvalApplications = libraries.filter((lib) => {
+    // Already approved or rejected libraries must never appear in approvals
+    if (lib.status === 'APPROVED' || lib.status === 'REJECTED') return false;
+
     if (isSubAdmin) {
+      // State Admin only sees pending applications that have NOT been forwarded to Master Admin
       return (
         lib.state === assignedState &&
-        (lib.status === 'PENDING' || lib.forwardedToMaster === true)
+        lib.status === 'PENDING' &&
+        !lib.forwardedToMaster
       );
     }
-    // Master Admin sees all pending, plus forwarded ones
-    return lib.status === 'PENDING' || lib.forwardedToMaster === true;
+
+    // Master Admin sees pending applications AND applications escalated/forwarded by State Admins
+    return lib.status === 'PENDING' || lib.status === 'FORWARDED_TO_MASTER' || lib.forwardedToMaster === true;
   });
 
   // State Libraries (for State Admin Library tab)

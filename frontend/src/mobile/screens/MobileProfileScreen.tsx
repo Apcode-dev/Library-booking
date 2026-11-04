@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
 import { compressProfileImage } from '../../lib/imageCompressor';
+import { INDIAN_STATES } from '../../components/common/MandatoryProfileModal';
 import {
   User,
   Mail,
@@ -27,6 +28,8 @@ import {
   ShieldAlert,
   RefreshCw,
   Sparkles,
+  IdCard,
+  MapPin,
 } from 'lucide-react';
 
 interface MobileProfileScreenProps {
@@ -44,8 +47,20 @@ export const MobileProfileScreen: React.FC<MobileProfileScreenProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [state, setState] = useState(user?.state || '');
+  const [city, setCity] = useState(user?.city || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      setPhone(user.phone || '');
+      setState(user.state || '');
+      setCity(user.city || '');
+      setAvatar(user.avatar || '');
+    }
+  }, [user]);
 
   // Modals for menu items
   const [activeModal, setActiveModal] = useState<
@@ -116,6 +131,8 @@ export const MobileProfileScreen: React.FC<MobileProfileScreenProps> = ({
       const res = await updateProfile({
         name: name.trim(),
         phone: phone.trim(),
+        state: state.trim(),
+        city: city.trim(),
         avatar: avatar || undefined,
       });
       if (res.success) {
@@ -235,14 +252,46 @@ export const MobileProfileScreen: React.FC<MobileProfileScreenProps> = ({
               </label>
               <input
                 type="tel"
+                maxLength={10}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
-                placeholder="+91 XXXXX XXXXX"
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-blue-500"
+                placeholder="10-digit mobile number"
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                  State
+                </label>
+                <select
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">Select State</option>
+                  {INDIAN_STATES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                  City
+                </label>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="e.g. Lucknow"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -265,6 +314,18 @@ export const MobileProfileScreen: React.FC<MobileProfileScreenProps> = ({
           </div>
         ) : (
           <div className="space-y-2 text-slate-300">
+            {user.role === 'USER' && (
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-800/60 bg-blue-950/20 px-2 rounded-xl">
+                <span className="text-slate-400 font-bold flex items-center gap-1">
+                  <IdCard className="w-3.5 h-3.5 text-blue-400" />
+                  Library Student ID
+                </span>
+                <span className="font-mono font-black text-blue-400">
+                  {user.studentId || 'LIB-STU-AUTO'}
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
               <span className="text-slate-500">Email Address</span>
               <span className="font-semibold text-white">{user.email}</span>
@@ -275,9 +336,23 @@ export const MobileProfileScreen: React.FC<MobileProfileScreenProps> = ({
               <span className="font-semibold text-white">{user.phone || 'Not added'}</span>
             </div>
 
+            <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+              <span className="text-slate-500">Location</span>
+              <span className="font-semibold text-white">
+                {user.city && user.state ? `${user.city}, ${user.state}` : user.state || user.city || 'Not specified'}
+              </span>
+            </div>
+
             <div className="flex items-center justify-between py-1">
               <span className="text-slate-500">Account Role</span>
-              <span className="font-semibold text-white capitalize">{user.role.toLowerCase()}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-white capitalize">
+                  {user.role === 'USER' ? 'Student' : user.role === 'OWNER' ? 'Library Owner' : user.role}
+                </span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-bold flex items-center gap-0.5">
+                  <Lock className="w-2.5 h-2.5" /> Locked
+                </span>
+              </div>
             </div>
           </div>
         )}

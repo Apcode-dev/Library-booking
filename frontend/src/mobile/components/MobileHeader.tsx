@@ -97,6 +97,8 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                 <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
               ) : user.role === 'OWNER' ? (
                 <Building2 className="w-3.5 h-3.5 text-amber-400" />
+              ) : user.role === 'MANAGER' ? (
+                <Building2 className="w-3.5 h-3.5 text-emerald-400" />
               ) : (
                 <UserIcon className="w-3.5 h-3.5 text-blue-400" />
               )}

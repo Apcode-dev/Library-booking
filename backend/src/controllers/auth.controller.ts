@@ -196,6 +196,11 @@ export class AuthController {
         approvalStatus = 'PENDING';
       }
 
+      let studentId: string | null = null;
+      if (userRole === 'USER') {
+        studentId = `LIB-STU-${Math.floor(10000 + Math.random() * 90000)}`;
+      }
+
       const user = await prisma.user.create({
         data: {
           name,
@@ -205,7 +210,9 @@ export class AuthController {
           role: userRole,
           isApproved,
           approvalStatus,
+          studentId,
           avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
+          isProfileComplete: false,
         },
       });
 
@@ -297,11 +304,18 @@ export class AuthController {
       }
 
       // STRICT ROLE GATE: Prevents student from logging in as owner, etc.
-      if (expectedRole && user.role !== expectedRole) {
+      // Note: If user is MANAGER, allow login under MANAGER or OWNER portal
+      const isRoleAllowed =
+        !expectedRole ||
+        user.role === expectedRole ||
+        (user.role === 'MANAGER' && (expectedRole === 'MANAGER' || expectedRole === 'OWNER'));
+
+      if (!isRoleAllowed) {
         const roleNames: Record<string, string> = {
           USER: 'Student',
           OWNER: 'Library Owner',
           ADMIN: 'Platform Admin',
+          MANAGER: 'Library Manager',
         };
         const currentRole = roleNames[user.role] || user.role;
         const attemptedRole = roleNames[expectedRole] || expectedRole;
@@ -325,6 +339,16 @@ export class AuthController {
         return;
       }
 
+      // If student lacks studentId, generate one now
+      let studentId = user.studentId;
+      if (user.role === 'USER' && !studentId) {
+        studentId = `LIB-STU-${Math.floor(10000 + Math.random() * 90000)}`;
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { studentId },
+        });
+      }
+
       const token = generateToken({
         userId: user.id,
         email: user.email,
@@ -337,6 +361,10 @@ export class AuthController {
         data: { activeToken: token },
       });
 
+      const isComplete = user.isProfileComplete || Boolean(
+        user.name && user.phone && user.state && user.city
+      );
+
       res.json({
         success: true,
         message: 'Logged in successfully!',
@@ -348,9 +376,14 @@ export class AuthController {
           role: user.role,
           phone: user.phone,
           avatar: user.avatar,
+          studentId,
+          state: user.state,
+          city: user.city,
+          isProfileComplete: isComplete,
           isApproved: user.isApproved,
           adminType: user.adminType || (user.role === 'ADMIN' ? 'MASTER_ADMIN' : null),
           assignedState: user.assignedState || null,
+          assignedLibraryId: user.assignedLibraryId || null,
         },
       });
     } catch (error: any) {
@@ -504,10 +537,27 @@ export class AuthController {
           role: true,
           phone: true,
           avatar: true,
+          studentId: true,
+          state: true,
+          city: true,
+          isProfileComplete: true,
           isApproved: true,
           approvalStatus: true,
           adminType: true,
           assignedState: true,
+          assignedLibraryId: true,
+          assignedLibrary: {
+            select: {
+              id: true,
+              name: true,
+              city: true,
+              state: true,
+              address: true,
+              openingTime: true,
+              closingTime: true,
+              status: true,
+            },
+          },
           createdAt: true,
           _count: {
             select: {
@@ -518,6 +568,27 @@ export class AuthController {
         },
       });
 
+      if (!user) {
+        res.status(404).json({ success: false, message: 'User not found' });
+        return;
+      }
+
+      // If Student has no studentId, auto-generate official Library Student ID
+      let studentId = user.studentId;
+      if (user.role === 'USER' && !studentId) {
+        studentId = `LIB-STU-${Math.floor(10000 + Math.random() * 90000)}`;
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { studentId },
+        });
+        (user as any).studentId = studentId;
+      }
+
+      const isComplete = user.isProfileComplete || Boolean(
+        user.name && user.phone && user.state && user.city
+      );
+      (user as any).isProfileComplete = isComplete;
+
       res.json({ success: true, user });
     } catch (error: any) {
       res.status(500).json({ success: false, message: 'Failed to fetch user', error: error.message });
@@ -525,7 +596,7 @@ export class AuthController {
   }
 
   /**
-   * Update Authenticated User Profile (Name, Phone, Avatar)
+   * Update Authenticated User Profile (Name, Phone, State, City, Avatar)
    */
   static async updateProfile(req: Request, res: Response): Promise<void> {
     try {
@@ -534,13 +605,38 @@ export class AuthController {
         return;
       }
 
-      const { name, phone, avatar } = req.body;
+      const { name, phone, avatar, state, city } = req.body;
+
+      const currentUser = await prisma.user.findUnique({
+        where: { id: req.user.id },
+      });
+
+      if (!currentUser) {
+        res.status(404).json({ success: false, message: 'User not found' });
+        return;
+      }
+
+      let studentId = currentUser.studentId;
+      if (currentUser.role === 'USER' && !studentId) {
+        studentId = `LIB-STU-${Math.floor(10000 + Math.random() * 90000)}`;
+      }
+
+      const newName = name ? name.trim() : currentUser.name;
+      const newPhone = phone !== undefined ? (phone ? phone.trim() : null) : currentUser.phone;
+      const newState = state !== undefined ? (state ? state.trim() : null) : currentUser.state;
+      const newCity = city !== undefined ? (city ? city.trim() : null) : currentUser.city;
+
+      const isComplete = Boolean(newName && newPhone && newState && newCity);
 
       const updatedUser = await prisma.user.update({
         where: { id: req.user.id },
         data: {
-          ...(name && { name: name.trim() }),
-          ...(phone !== undefined && { phone: phone ? phone.trim() : null }),
+          name: newName,
+          phone: newPhone,
+          state: newState,
+          city: newCity,
+          studentId,
+          isProfileComplete: isComplete,
           ...(avatar !== undefined && { avatar: avatar ? avatar.trim() : null }),
         },
         select: {
@@ -550,10 +646,15 @@ export class AuthController {
           role: true,
           phone: true,
           avatar: true,
+          studentId: true,
+          state: true,
+          city: true,
+          isProfileComplete: true,
           isApproved: true,
           approvalStatus: true,
           adminType: true,
           assignedState: true,
+          assignedLibraryId: true,
           createdAt: true,
         },
       });

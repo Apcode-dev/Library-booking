@@ -1,4 +1,4 @@
-export type UserRole = 'USER' | 'OWNER' | 'ADMIN';
+export type UserRole = 'USER' | 'OWNER' | 'ADMIN' | 'MANAGER' | string;
 
 export interface User {
   id: string;
@@ -7,6 +7,20 @@ export interface User {
   role: UserRole;
   phone?: string;
   avatar?: string;
+  studentId?: string;
+  state?: string;
+  city?: string;
+  isProfileComplete?: boolean;
+  assignedLibraryId?: string;
+  assignedLibrary?: {
+    id: string;
+    name: string;
+    city: string;
+    state: string;
+    address?: string;
+    openingTime?: string;
+    closingTime?: string;
+  };
   adminType?: 'MASTER_ADMIN' | 'SUB_ADMIN' | string;
   assignedState?: string | null;
   isApproved?: boolean;

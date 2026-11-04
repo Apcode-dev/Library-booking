@@ -270,12 +270,26 @@ export class AdminController {
       // If Sub-Admin, enforce state filter strictly
       if (isSubAdmin && assignedState) {
         whereClause.state = assignedState;
+        if (status === 'PENDING') {
+          // Sub-Admin only sees pending libraries that have NOT been forwarded to Master Admin
+          whereClause.status = 'PENDING';
+          whereClause.forwardedToMaster = false;
+        }
       } else if (requestedState && typeof requestedState === 'string' && requestedState !== 'ALL') {
         whereClause.state = requestedState;
       }
 
       if (status && typeof status === 'string' && status !== 'ALL') {
-        whereClause.status = status;
+        if (status === 'PENDING' && !isSubAdmin) {
+          // Master Admin sees all pending libraries AND forwarded escalations
+          whereClause.OR = [
+            { status: 'PENDING' },
+            { status: 'FORWARDED_TO_MASTER' },
+            { forwardedToMaster: true },
+          ];
+        } else if (!isSubAdmin || status !== 'PENDING') {
+          whereClause.status = status;
+        }
       }
 
       const libraries = await prisma.library.findMany({

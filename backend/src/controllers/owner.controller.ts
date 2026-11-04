@@ -1087,4 +1087,166 @@ export class OwnerController {
       res.status(500).json({ success: false, message: 'Failed to reset PIN', error: error.message });
     }
   }
+
+  // =========================================================================
+  // LIBRARY MANAGERS MANAGEMENT (Owner Appoints 1 Manager per Library)
+  // =========================================================================
+
+  /**
+   * Create Library Manager (1 Manager = 1 Library)
+   */
+  static async createManager(req: Request, res: Response): Promise<void> {
+    try {
+      const ownerId = req.user!.id;
+      const { name, email, password, phone, securityPin, libraryId } = req.body;
+
+      if (!name || !email || !password || !securityPin || !libraryId) {
+        res.status(400).json({
+          success: false,
+          message: 'Name, email, password, security PIN (6 digits), and libraryId are required.',
+        });
+        return;
+      }
+
+      if (!/^\d{6}$/.test(securityPin.toString().trim())) {
+        res.status(400).json({
+          success: false,
+          message: 'Security PIN must be exactly 6 numeric digits.',
+        });
+        return;
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Check if library belongs to owner
+      const library = await prisma.library.findFirst({
+        where: { id: libraryId, ownerId },
+      });
+
+      if (!library) {
+        res.status(404).json({
+          success: false,
+          message: 'Library not found or does not belong to you.',
+        });
+        return;
+      }
+
+      // Check 1 Manager = 1 Library rule
+      const existingLibraryManager = await prisma.user.findFirst({
+        where: { assignedLibraryId: libraryId, role: 'MANAGER' },
+      });
+
+      if (existingLibraryManager) {
+        res.status(400).json({
+          success: false,
+          message: `This library already has an assigned manager (${existingLibraryManager.name}). Each library can only have one manager.`,
+        });
+        return;
+      }
+
+      // Check if email already registered
+      const existingUser = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+
+      if (existingUser) {
+        res.status(400).json({
+          success: false,
+          message: 'An account with this email address already exists.',
+        });
+        return;
+      }
+
+      const passwordHash = await bcrypt.hash(password.trim(), 10);
+      const pinHash = await bcrypt.hash(securityPin.toString().trim(), 10);
+
+      const manager = await prisma.user.create({
+        data: {
+          name: name.trim(),
+          email: normalizedEmail,
+          password: passwordHash,
+          phone: phone ? phone.trim() : null,
+          role: 'MANAGER',
+          isApproved: true,
+          approvalStatus: 'APPROVED',
+          isProfileComplete: true,
+          securityPin: pinHash,
+          assignedLibraryId: libraryId,
+          createdById: ownerId,
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          assignedLibraryId: true,
+          assignedLibrary: { select: { id: true, name: true, city: true, state: true } },
+          createdAt: true,
+        },
+      });
+
+      res.status(201).json({
+        success: true,
+        message: `Library Manager "${manager.name}" created successfully and assigned to "${library.name}"!`,
+        manager,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to create manager', error: error.message });
+    }
+  }
+
+  /**
+   * List All Managers created by this Owner
+   */
+  static async getManagers(req: Request, res: Response): Promise<void> {
+    try {
+      const ownerId = req.user!.id;
+
+      const managers = await prisma.user.findMany({
+        where: { createdById: ownerId, role: 'MANAGER' },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          assignedLibraryId: true,
+          assignedLibrary: {
+            select: { id: true, name: true, city: true, state: true },
+          },
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      res.json({ success: true, managers });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to list managers', error: error.message });
+    }
+  }
+
+  /**
+   * Delete a Manager
+   */
+  static async deleteManager(req: Request, res: Response): Promise<void> {
+    try {
+      const ownerId = req.user!.id;
+      const { id } = req.params;
+
+      const manager = await prisma.user.findFirst({
+        where: { id, createdById: ownerId, role: 'MANAGER' },
+      });
+
+      if (!manager) {
+        res.status(404).json({ success: false, message: 'Manager not found or unauthorized.' });
+        return;
+      }
+
+      await prisma.user.delete({ where: { id } });
+
+      res.json({ success: true, message: 'Library manager removed successfully.' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to delete manager', error: error.message });
+    }
+  }
 }
