@@ -267,11 +267,13 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    let loadingToastId: any = null;
     try {
-      toast.loading('Optimizing admin photo...', { id: 'admin-photo' });
+      loadingToastId = toast.loading('Optimizing admin photo...');
       const dataUrl = await compressProfileImage(file, 400, 0.75);
 
       const res = await updateProfile({ avatar: dataUrl });
+      if (loadingToastId) toast.dismiss(loadingToastId);
       toast.dismiss('admin-photo');
 
       if (res.success) {
@@ -280,6 +282,7 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
         toast.error(res.message || 'Failed to save photo.');
       }
     } catch (err: any) {
+      if (loadingToastId) toast.dismiss(loadingToastId);
       toast.dismiss('admin-photo');
       toast.error(err.message || 'Error saving profile photo.');
     } finally {

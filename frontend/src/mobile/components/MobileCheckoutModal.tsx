@@ -150,7 +150,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
           },
         },
         handler: async function (response: any) {
-          toast.loading('Verifying Razorpay payment & generating QR pass...', { id: 'rzp-confirm' });
+          const loadingToastId = toast.loading('Verifying Razorpay payment & generating QR pass...');
           try {
             const res = await api.post('/bookings/confirm', {
               lockToken: lockData.lockToken,
@@ -161,7 +161,10 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
               razorpaySignature: response.razorpay_signature,
             });
 
+            // Cleanly dismiss the loading bar immediately
+            toast.dismiss(loadingToastId);
             toast.dismiss('rzp-confirm');
+
             if (res.data.success) {
               try {
                 confetti({
@@ -178,6 +181,7 @@ export const MobileCheckoutModal: React.FC<MobileCheckoutModalProps> = ({
               toast.error(res.data.message || 'Payment confirmation failed.');
             }
           } catch (err: any) {
+            toast.dismiss(loadingToastId);
             toast.dismiss('rzp-confirm');
             toast.error(err.response?.data?.message || 'Error confirming booking payment.');
           } finally {

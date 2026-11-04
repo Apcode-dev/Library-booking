@@ -254,11 +254,13 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    let loadingToastId: any = null;
     try {
-      toast.loading('Optimizing partner photo...', { id: 'owner-photo' });
+      loadingToastId = toast.loading('Optimizing partner photo...');
       const dataUrl = await compressProfileImage(file, 400, 0.75);
 
       const res = await updateProfile({ avatar: dataUrl });
+      if (loadingToastId) toast.dismiss(loadingToastId);
       toast.dismiss('owner-photo');
 
       if (res.success) {
@@ -267,6 +269,7 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
         toast.error(res.message || 'Failed to save photo.');
       }
     } catch (err: any) {
+      if (loadingToastId) toast.dismiss(loadingToastId);
       toast.dismiss('owner-photo');
       toast.error(err.message || 'Error saving profile photo.');
     } finally {

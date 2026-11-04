@@ -99,7 +99,7 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
           color: '#2563eb', // Matches LibSpace brand blue
         },
         handler: async function (response: any) {
-          toast.loading('Verifying Razorpay payment & generating QR pass...', { id: 'rzp-confirm' });
+          const loadingToastId = toast.loading('Verifying Razorpay payment & generating QR pass...');
           try {
             const res = await api.post('/bookings/confirm', {
               lockToken: lockData.lockToken,
@@ -110,7 +110,10 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
               razorpaySignature: response.razorpay_signature,
             });
 
+            // Cleanly dismiss the loading toast immediately
+            toast.dismiss(loadingToastId);
             toast.dismiss('rzp-confirm');
+
             if (res.data.success) {
               setConfirmedBooking(res.data.booking);
               toast.success(`Payment verified! (ID: ${response.razorpay_payment_id})`);
@@ -123,6 +126,7 @@ export const BookingCheckoutModal: React.FC<BookingCheckoutModalProps> = ({
               } catch (_) {}
             }
           } catch (err: any) {
+            toast.dismiss(loadingToastId);
             toast.dismiss('rzp-confirm');
             const msg = err.response?.data?.message || 'Payment confirmation failed.';
             setError(msg);

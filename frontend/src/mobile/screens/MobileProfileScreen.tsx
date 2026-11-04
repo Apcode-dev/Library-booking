@@ -86,12 +86,14 @@ export const MobileProfileScreen: React.FC<MobileProfileScreenProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    let loadingToastId: any = null;
     try {
-      toast.loading('Processing & optimizing photo...', { id: 'photo-upload' });
+      loadingToastId = toast.loading('Processing & optimizing photo...');
       const dataUrl = await compressProfileImage(file, 400, 0.75);
       setAvatar(dataUrl);
 
       const res = await updateProfile({ avatar: dataUrl });
+      if (loadingToastId) toast.dismiss(loadingToastId);
       toast.dismiss('photo-upload');
 
       if (res.success) {
@@ -100,6 +102,7 @@ export const MobileProfileScreen: React.FC<MobileProfileScreenProps> = ({
         toast.error(res.message || 'Failed to save photo.');
       }
     } catch (err: any) {
+      if (loadingToastId) toast.dismiss(loadingToastId);
       toast.dismiss('photo-upload');
       toast.error(err.message || 'Error saving profile photo.');
     } finally {
