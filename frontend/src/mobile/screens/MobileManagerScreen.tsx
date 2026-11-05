@@ -38,6 +38,10 @@ import {
   IdCard,
   X,
   MapPin,
+  IndianRupee,
+  Wallet,
+  History,
+  Archive,
 } from 'lucide-react';
 
 interface MobileManagerScreenProps {
@@ -58,6 +62,8 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
   const [managerInfo, setManagerInfo] = useState<any>(null);
   const [todayCheckIns, setTodayCheckIns] = useState(0);
   const [activeBookingsCount, setActiveBookingsCount] = useState(0);
+  const [dashboardMetrics, setDashboardMetrics] = useState<any>(null);
+  const [isOldRecordsModalOpen, setIsOldRecordsModalOpen] = useState(false);
 
   // PIN Unlock state
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -97,6 +103,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
         setManagerInfo(dashRes.data.manager);
         setTodayCheckIns(dashRes.data.todayCheckIns || 0);
         setActiveBookingsCount(dashRes.data.activeBookings || 0);
+        setDashboardMetrics(dashRes.data.metrics || null);
       } else if (dashRes.data.message) {
         toast.error(dashRes.data.message);
       }
@@ -244,8 +251,11 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
         </p>
         <button
           type="button"
-          onClick={() => logout()}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold"
+          onClick={() => {
+            logout();
+            onNavigateTab?.('explore');
+          }}
+          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold cursor-pointer transition active:scale-95"
         >
           Sign Out
         </button>
@@ -278,17 +288,6 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
               <span className="text-[10px] text-slate-400">{library.city}, {library.state}</span>
             </div>
           </div>
-
-          <div className="text-right">
-            <button
-              type="button"
-              onClick={() => onNavigateTab?.('manager_attendance')}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center gap-1 shadow-md shadow-emerald-950/40 active:scale-95 transition cursor-pointer"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <span>Gate Scan</span>
-            </button>
-          </div>
         </div>
 
         {/* Branch Card (Locked / Unlocked) */}
@@ -316,20 +315,105 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
           </div>
         ) : (
           <div className="space-y-4 animate-slide-up">
-            {/* Quick Metrics Bar */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase">Total Desks</span>
-                <span className="text-base font-black text-white">{library.seats?.length || library.totalSeats || 0}</span>
+            {/* 4-Card Revenue & Occupancy Analytics */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* Card 1: Total Revenue (Current Month) */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-950/60 via-slate-900 to-slate-950 border border-emerald-500/30 space-y-1 relative overflow-hidden shadow-md">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">
+                    Total Revenue
+                  </span>
+                  <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+                    <IndianRupee className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="pt-0.5">
+                  <span className="text-lg font-black text-white block">
+                    ₹{(dashboardMetrics?.currentMonthRevenue || 0).toLocaleString('en-IN')}
+                  </span>
+                  <span className="text-[9px] text-emerald-400 font-semibold block">
+                    {dashboardMetrics?.currentMonthName || 'Current Month'} Collection
+                  </span>
+                </div>
               </div>
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase">Today Punches</span>
-                <span className="text-base font-black text-emerald-400">{todayCheckIns}</span>
+
+              {/* Card 2: Today's Payout / Collection */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-950/60 via-slate-900 to-slate-950 border border-blue-500/30 space-y-1 relative overflow-hidden shadow-md">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider block">
+                    Today's Payout
+                  </span>
+                  <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
+                    <Wallet className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="pt-0.5">
+                  <span className="text-lg font-black text-white block">
+                    ₹{(dashboardMetrics?.todayRevenue || 0).toLocaleString('en-IN')}
+                  </span>
+                  <span className="text-[9px] text-blue-400 font-semibold block">
+                    Today's Collection
+                  </span>
+                </div>
               </div>
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase">Active Passes</span>
-                <span className="text-base font-black text-blue-400">{activeBookingsCount}</span>
+
+              {/* Card 3: Live Occupancy */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-950/60 via-slate-900 to-slate-950 border border-purple-500/30 space-y-1 relative overflow-hidden shadow-md">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block">
+                    Live Occupancy
+                  </span>
+                  <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400">
+                    <Armchair className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="pt-0.5">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-lg font-black text-white">
+                      {dashboardMetrics?.occupiedSeats ?? activeBookingsCount}
+                    </span>
+                    <span className="text-xs text-slate-400 font-bold">
+                      / {dashboardMetrics?.totalSeats ?? (library.seats?.length || library.totalSeats || 0)} Desks
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 pt-0.5">
+                    <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
+                        style={{ width: `${Math.min(100, dashboardMetrics?.occupancyRate || 0)}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-[9px] font-black text-purple-300 font-mono">
+                      {dashboardMetrics?.occupancyRate || 0}%
+                    </span>
+                  </div>
+                </div>
               </div>
+
+              {/* Card 4: Old Records (Monthly Historical Archive) */}
+              <button
+                type="button"
+                onClick={() => setIsOldRecordsModalOpen(true)}
+                className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-950/60 via-slate-900 to-slate-950 border border-amber-500/30 space-y-1 relative overflow-hidden text-left hover:border-amber-500/60 transition active:scale-95 cursor-pointer shadow-md"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">
+                    Old Records
+                  </span>
+                  <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
+                    <History className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="pt-0.5">
+                  <span className="text-lg font-black text-white block">
+                    {dashboardMetrics?.oldRecords?.length || 0} Months
+                  </span>
+                  <span className="text-[9px] text-amber-400 font-bold flex items-center gap-1">
+                    <span>View Archive</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </button>
             </div>
 
             {/* Sub-views Selector */}
@@ -466,6 +550,83 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Old Records (Monthly Historical Archive) Modal */}
+        {isOldRecordsModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in text-xs">
+            <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    <History className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white">Old Records & Past Months</h3>
+                    <span className="text-[10px] text-slate-400">Archived Monthly Revenue • {library.name}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsOldRecordsModalOpen(false)}
+                  className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
+                💡 <strong>Auto-Archive:</strong> Current month ({dashboardMetrics?.currentMonthName || 'This Month'}) complete hote hi uska total revenue aur bookings data yahan automatically archive ho jata hai.
+              </div>
+
+              <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
+                {(!dashboardMetrics?.oldRecords || dashboardMetrics.oldRecords.length === 0) ? (
+                  <div className="p-8 text-center bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                    <Archive className="w-8 h-8 text-slate-600 mx-auto" />
+                    <p className="text-white font-bold text-xs">No Past Months Archived Yet</p>
+                    <p className="text-[10px] text-slate-400">
+                      Jab yeh maheena ({dashboardMetrics?.currentMonthName || 'Current Month'}) pura hoga, tab uska revenue yahan auto-archive ho jayega.
+                    </p>
+                  </div>
+                ) : (
+                  dashboardMetrics.oldRecords.map((rec: any) => (
+                    <div
+                      key={rec.monthKey}
+                      className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-center justify-between hover:border-emerald-500/40 transition"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="font-extrabold text-white text-xs">{rec.label}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 block">
+                          {rec.bookingsCount} Completed Bookings
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono font-black text-sm text-emerald-400 block">
+                          ₹{rec.totalRevenue.toLocaleString('en-IN')}
+                        </span>
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-bold inline-block">
+                          Archived
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsOldRecordsModalOpen(false)}
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold cursor-pointer transition active:scale-95"
+                >
+                  Close Archive
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -865,12 +1026,13 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
         <button
           type="button"
           onClick={() => {
-            if (confirm('Are you sure you want to log out of the Manager Console?')) {
-              logout();
-              toast.success('Manager session signed out.');
+            logout();
+            toast.success('Manager session signed out successfully.');
+            if (onNavigateTab) {
+              onNavigateTab('explore');
             }
           }}
-          className="w-full p-3.5 flex items-center justify-between text-left hover:bg-rose-950/20 transition cursor-pointer"
+          className="w-full p-3.5 flex items-center justify-between text-left hover:bg-rose-950/20 transition cursor-pointer active:scale-95"
         >
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
@@ -878,7 +1040,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
             </div>
             <div>
               <span className="font-bold text-rose-300 block">Log Out</span>
-              <span className="text-[10px] text-slate-500">Sign out of manager portal</span>
+              <span className="text-[10px] text-slate-500">Sign out and return to Home Page</span>
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-slate-600" />

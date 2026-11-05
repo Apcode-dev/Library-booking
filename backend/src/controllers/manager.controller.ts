@@ -49,6 +49,11 @@ export class ManagerController {
       }
 
       const todayDateStr = new Date().toLocaleDateString('en-CA');
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth(); // 0-indexed
+      const currentMonthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+
       const todayCheckIns = await prisma.attendance.count({
         where: {
           libraryId: library.id,
@@ -62,6 +67,71 @@ export class ManagerController {
           status: { in: ['CONFIRMED', 'ACTIVE'] },
         },
       });
+
+      // Fetch confirmed/completed bookings for revenue & occupancy calculation
+      const allBookings = await prisma.booking.findMany({
+        where: {
+          libraryId: library.id,
+          status: { in: ['CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'ACTIVE'] },
+        },
+        include: {
+          payment: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      let todayRevenue = 0;
+      let currentMonthRevenue = 0;
+      const oldRecordsMap = new Map<string, { totalRevenue: number; bookingsCount: number }>();
+
+      const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+
+      allBookings.forEach((b) => {
+        const amount = b.payment?.amount || b.totalAmount || 0;
+        const bDateStr = b.date || b.createdAt.toISOString().split('T')[0];
+        const bMonthKey = bDateStr.slice(0, 7); // "YYYY-MM"
+
+        if (bDateStr === todayDateStr) {
+          todayRevenue += amount;
+        }
+
+        if (bMonthKey === currentMonthKey) {
+          currentMonthRevenue += amount;
+        } else if (bMonthKey < currentMonthKey) {
+          const current = oldRecordsMap.get(bMonthKey) || { totalRevenue: 0, bookingsCount: 0 };
+          current.totalRevenue += amount;
+          current.bookingsCount += 1;
+          oldRecordsMap.set(bMonthKey, current);
+        }
+      });
+
+      // Format oldRecords as sorted array (most recent past month first)
+      const oldRecords = Array.from(oldRecordsMap.entries())
+        .map(([mKey, data]) => {
+          const [y, m] = mKey.split('-');
+          const monthIndex = parseInt(m, 10) - 1;
+          const label = `${monthNames[monthIndex] || mKey} ${y}`;
+          return {
+            monthKey: mKey,
+            label,
+            totalRevenue: Math.round(data.totalRevenue * 100) / 100,
+            bookingsCount: data.bookingsCount,
+          };
+        })
+        .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+
+      const totalSeats = library.seats.length || library.totalSeats || 0;
+      const activeRightNow = allBookings.filter((b) => {
+        const start = new Date(b.startDateTime);
+        const end = new Date(b.endDateTime);
+        return start <= now && end >= now;
+      }).length;
+
+      const liveOccupiedSeats = activeRightNow > 0 ? activeRightNow : activeBookings;
+      const occupancyRate = totalSeats > 0 ? Math.min(100, Math.round((liveOccupiedSeats / totalSeats) * 100)) : 0;
 
       res.json({
         success: true,
@@ -79,6 +149,15 @@ export class ManagerController {
         },
         todayCheckIns,
         activeBookings,
+        metrics: {
+          todayRevenue: Math.round(todayRevenue * 100) / 100,
+          currentMonthRevenue: Math.round(currentMonthRevenue * 100) / 100,
+          currentMonthName: `${monthNames[currentMonth]} ${currentYear}`,
+          totalSeats,
+          occupiedSeats: liveOccupiedSeats,
+          occupancyRate,
+          oldRecords,
+        },
       });
     } catch (error: any) {
       res.status(500).json({ success: false, message: 'Failed to fetch manager dashboard', error: error.message });
