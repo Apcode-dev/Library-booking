@@ -8,24 +8,19 @@ import {
   Calendar,
   Wifi,
   MapPin,
-  Lock,
   ArrowRight,
   GraduationCap,
   Building2,
   Shield,
-  Compass,
-  CheckCircle2,
-  Zap,
 } from 'lucide-react';
 
 interface MobileWelcomeScreenProps {
   onSelectRoleLogin: (role: UserRole) => void;
-  onExploreAsGuest: () => void;
+  onExploreAsGuest?: () => void;
 }
 
 export const MobileWelcomeScreen: React.FC<MobileWelcomeScreenProps> = ({
   onSelectRoleLogin,
-  onExploreAsGuest,
 }) => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans pb-12 selection:bg-blue-600 selection:text-white">
@@ -46,15 +41,6 @@ export const MobileWelcomeScreen: React.FC<MobileWelcomeScreenProps> = ({
             </p>
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={onExploreAsGuest}
-          className="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 transition active:scale-95 cursor-pointer"
-        >
-          <span>Skip to Explore</span>
-          <ArrowRight className="w-3.5 h-3.5 text-blue-400" />
-        </button>
       </div>
 
       <div className="px-5 pt-6 space-y-7">
@@ -234,7 +220,7 @@ export const MobileWelcomeScreen: React.FC<MobileWelcomeScreenProps> = ({
               <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-1 transition flex-shrink-0" />
             </button>
 
-            {/* Library Owner Login Card */}
+            {/* Library Owner / Manager Login Card */}
             <button
               type="button"
               onClick={() => onSelectRoleLogin('OWNER')}
@@ -246,7 +232,7 @@ export const MobileWelcomeScreen: React.FC<MobileWelcomeScreenProps> = ({
                 </div>
                 <div>
                   <h5 className="text-xs font-bold text-white group-hover:text-emerald-400 transition">
-                    Library Owner Portal
+                    Library Owner / Manager Console
                   </h5>
                   <p className="text-[10px] text-slate-400">
                     Branches console, day attendance, seat map & payouts
@@ -278,19 +264,6 @@ export const MobileWelcomeScreen: React.FC<MobileWelcomeScreenProps> = ({
               <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 group-hover:translate-x-1 transition flex-shrink-0" />
             </button>
           </div>
-        </div>
-
-        {/* Continue As Guest */}
-        <div className="pt-2 text-center">
-          <button
-            type="button"
-            onClick={onExploreAsGuest}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer py-2 px-4 rounded-xl bg-slate-900/60 border border-slate-800 active:scale-95"
-          >
-            <Compass className="w-3.5 h-3.5 text-blue-400" />
-            <span>Continue as Guest to Browse Libraries</span>
-            <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
-          </button>
         </div>
       </div>
     </div>

@@ -253,7 +253,6 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
           type="button"
           onClick={() => {
             logout();
-            onNavigateTab?.('explore');
           }}
           className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold cursor-pointer transition active:scale-95"
         >
@@ -1028,9 +1027,6 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
           onClick={() => {
             logout();
             toast.success('Manager session signed out successfully.');
-            if (onNavigateTab) {
-              onNavigateTab('explore');
-            }
           }}
           className="w-full p-3.5 flex items-center justify-between text-left hover:bg-rose-950/20 transition cursor-pointer active:scale-95"
         >
@@ -1040,7 +1036,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
             </div>
             <div>
               <span className="font-bold text-rose-300 block">Log Out</span>
-              <span className="text-[10px] text-slate-500">Sign out and return to Home Page</span>
+              <span className="text-[10px] text-slate-500">Sign out and return to Info Gateway</span>
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-slate-600" />

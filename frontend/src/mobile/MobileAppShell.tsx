@@ -71,8 +71,8 @@ export const MobileAppShell: React.FC = () => {
         setActiveTab('explore');
       }
     } else {
-      // User logged out -> directly show Explore / Home Page
-      setHasDismissedWelcome(true);
+      // User logged out -> directly show Info / Welcome Gateway Page
+      setHasDismissedWelcome(false);
       setActiveTab('explore');
       setSelectedLibrary(null);
     }

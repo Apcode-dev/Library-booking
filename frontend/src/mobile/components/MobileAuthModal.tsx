@@ -252,7 +252,7 @@ export const MobileAuthModal: React.FC<MobileAuthModalProps> = ({
                 }`}
               >
                 <Building2 className="w-3.5 h-3.5" />
-                <span>Owner</span>
+                <span>Owner / Mgr</span>
               </button>
 
               <button
