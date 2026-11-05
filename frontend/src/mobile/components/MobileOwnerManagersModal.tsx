@@ -76,12 +76,21 @@ export const MobileOwnerManagersModal: React.FC<MobileOwnerManagersModalProps> =
     if (isOpen) {
       fetchManagers();
       setIsAdding(false);
-      // Auto select first available library
-      if (libraries.length > 0) {
+    }
+  }, [isOpen]);
+
+  // When opening add form or when managers change, auto-select first available UNASSIGNED library
+  useEffect(() => {
+    if (isAdding && libraries.length > 0) {
+      const assignedIds = new Set(managers.map((m) => m.assignedLibraryId));
+      const firstAvailable = libraries.find((l) => !assignedIds.has(l.id));
+      if (firstAvailable) {
+        setSelectedLibraryId(firstAvailable.id);
+      } else {
         setSelectedLibraryId(libraries[0].id);
       }
     }
-  }, [isOpen, libraries]);
+  }, [isAdding, libraries, managers]);
 
   if (!isOpen) return null;
 
@@ -123,7 +132,13 @@ export const MobileOwnerManagersModal: React.FC<MobileOwnerManagersModalProps> =
         toast.error(res.data.message || 'Failed to create manager.');
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Error creating manager.');
+      const errMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        (err.code === 'ECONNABORTED' ? 'Request timed out. Please try again.' : null) ||
+        err.message ||
+        'Error creating manager.';
+      toast.error(errMsg);
     } finally {
       setSubmitting(false);
     }
@@ -294,22 +309,36 @@ export const MobileOwnerManagersModal: React.FC<MobileOwnerManagersModalProps> =
                 <label className="text-[10px] font-bold text-slate-400 uppercase">
                   Assign Library Branch (1 Manager = 1 Library) *
                 </label>
-                <select
-                  required
-                  value={selectedLibraryId}
-                  onChange={(e) => setSelectedLibraryId(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
-                >
-                  <option value="" disabled>Select a library</option>
-                  {libraries.map((lib) => {
-                    const alreadyAssigned = assignedLibIds.has(lib.id);
-                    return (
-                      <option key={lib.id} value={lib.id} disabled={alreadyAssigned}>
-                        {lib.name} ({lib.city}) {alreadyAssigned ? '— [Already Assigned]' : ''}
-                      </option>
-                    );
-                  })}
-                </select>
+                {libraries.length === 0 ? (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>No library branches found. Please create a library branch first.</span>
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      required
+                      value={selectedLibraryId}
+                      onChange={(e) => setSelectedLibraryId(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                    >
+                      <option value="" disabled>Select a library</option>
+                      {libraries.map((lib) => {
+                        const alreadyAssigned = assignedLibIds.has(lib.id);
+                        return (
+                          <option key={lib.id} value={lib.id} disabled={alreadyAssigned}>
+                            {lib.name} ({lib.city}) {alreadyAssigned ? '— [Already Assigned]' : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    {libraries.every((l) => assignedLibIds.has(l.id)) && (
+                      <p className="text-[10px] text-amber-400 font-medium">
+                        ⚠️ All your branches currently have an assigned manager. Remove an existing manager or add a new branch to appoint more staff.
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Submit Button */}
