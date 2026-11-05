@@ -14,6 +14,7 @@ import {
   ArrowRight,
   BadgeAlert,
   IdCard,
+  X,
 } from 'lucide-react';
 
 export const INDIAN_STATES = [
@@ -58,9 +59,17 @@ export const MandatoryProfileModal: React.FC = () => {
   const isStudent = user?.role === 'USER';
   const isOwner = user?.role === 'OWNER';
 
+  const [isDismissed, setIsDismissed] = useState(false);
+  const storageKey = user?.id ? `libspace_profile_completed_${user.id}` : null;
+  const isLocallyCompleted = Boolean(
+    storageKey && localStorage.getItem(storageKey) === 'true'
+  );
+
   // Check if profile is complete (name, phone, state, city)
   const isComplete = Boolean(
-    user?.isProfileComplete ||
+    isDismissed ||
+      isLocallyCompleted ||
+      user?.isProfileComplete ||
       (user?.name && user?.phone && user?.state && user?.city)
   );
 
@@ -79,8 +88,8 @@ export const MandatoryProfileModal: React.FC = () => {
     }
   }, [user]);
 
-  // Don't show modal if user is not logged in, or is Admin/Manager, or profile is already complete
-  if (!user || user.role === 'ADMIN' || user.role === 'MANAGER' || isComplete) {
+  // Don't show modal if user is not logged in, or is Admin/Manager, or profile is already complete/dismissed
+  if (!user || user.role === 'ADMIN' || user.role === 'MANAGER' || isComplete || isDismissed) {
     return null;
   }
 
@@ -122,8 +131,12 @@ export const MandatoryProfileModal: React.FC = () => {
       if (tId) toast.dismiss(tId);
 
       if (res.success) {
+        setIsDismissed(true);
+        if (storageKey) {
+          localStorage.setItem(storageKey, 'true');
+        }
         toast.success('Profile details verified & completed! 🎉');
-        await refreshUser();
+        refreshUser().catch(() => {});
       } else {
         toast.error(res.message || 'Failed to complete profile.');
       }
@@ -156,6 +169,19 @@ export const MandatoryProfileModal: React.FC = () => {
                 : 'Please complete your owner profile to manage your libraries, staff & seat reservations.'}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsDismissed(true);
+              if (storageKey) {
+                localStorage.setItem(storageKey, 'true');
+              }
+            }}
+            className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition active:scale-95 shrink-0"
+            title="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Form Body */}

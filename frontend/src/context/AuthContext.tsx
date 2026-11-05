@@ -36,7 +36,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await api.get('/auth/me');
       if (res.data.success) {
-        setUser(res.data.user);
+        const u = res.data.user;
+        const isLocallyDone = Boolean(
+          u?.id && localStorage.getItem(`libspace_profile_completed_${u.id}`) === 'true'
+        );
+        const isDone = Boolean(
+          u?.isProfileComplete ||
+          isLocallyDone ||
+          (u?.name && u?.phone && u?.state && u?.city)
+        );
+        setUser({ ...u, isProfileComplete: isDone });
         if (res.data.user?.id) {
           localStorage.setItem('libspace_user_id', res.data.user.id);
         }
@@ -134,8 +143,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = async (data: { name?: string; phone?: string; avatar?: string; state?: string; city?: string }) => {
     const res = await api.patch('/auth/profile', data);
-    if (res.data.success && res.data.user) {
-      setUser(res.data.user);
+    if (res.data.success) {
+      const serverUser = res.data.user || {};
+      const updatedUser: User = {
+        ...(user || {} as any),
+        ...serverUser,
+        ...(data.name && { name: data.name }),
+        ...(data.phone && { phone: data.phone }),
+        ...(data.state && { state: data.state }),
+        ...(data.city && { city: data.city }),
+        isProfileComplete: true,
+      };
+      setUser(updatedUser);
+      if (updatedUser.id) {
+        localStorage.setItem(`libspace_profile_completed_${updatedUser.id}`, 'true');
+      }
     }
     return res.data;
   };
