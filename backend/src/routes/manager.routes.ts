@@ -14,6 +14,8 @@ router.patch('/seats/:seatId/toggle', ManagerController.toggleSeat);
 
 // Bookings strictly for assigned library
 router.get('/bookings', ManagerController.getBookings);
+router.get('/bookings/daily', ManagerController.getDailyBookings);
+router.get('/bookings/old', ManagerController.getOldBookings);
 
 // Attendance & Gate Pass Scanner strictly for assigned library
 router.post('/verify-qr', ManagerController.verifyQrCode);

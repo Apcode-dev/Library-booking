@@ -65,6 +65,12 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
   const [dashboardMetrics, setDashboardMetrics] = useState<any>(null);
   const [isOldRecordsModalOpen, setIsOldRecordsModalOpen] = useState(false);
 
+  // Old Bookings Archive State
+  const [isOldBookingsModalOpen, setIsOldBookingsModalOpen] = useState(false);
+  const [oldBookingsDays, setOldBookingsDays] = useState<any[]>([]);
+  const [loadingOldBookings, setLoadingOldBookings] = useState(false);
+  const [expandedDate, setExpandedDate] = useState<string | null>(null);
+
   // PIN Unlock state
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
@@ -74,7 +80,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
   // Sub-view in dashboard
   const [branchSubView, setBranchSubView] = useState<'metrics' | 'seats' | 'students'>('metrics');
 
-  // Bookings Tab state
+  // Bookings Tab state (Strictly today's daily bookings)
   const [bookings, setBookings] = useState<any[]>([]);
   const [bookingSearch, setBookingSearch] = useState('');
   const [bookingFilterType, setBookingFilterType] = useState('ALL');
@@ -94,7 +100,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
     try {
       const [dashRes, bookingsRes, usersRes] = await Promise.all([
         api.get('/manager/dashboard').catch(() => ({ data: { success: false } })),
-        api.get('/manager/bookings').catch(() => ({ data: { success: false, bookings: [] } })),
+        api.get('/manager/bookings/daily').catch(() => ({ data: { success: false, bookings: [] } })),
         api.get('/manager/users').catch(() => ({ data: { success: false, students: [] } })),
       ]);
 
@@ -119,6 +125,23 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
       toast.error('Failed to load manager portal data.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOldBookings = async () => {
+    setLoadingOldBookings(true);
+    try {
+      const res = await api.get('/manager/bookings/old');
+      if (res.data.success) {
+        setOldBookingsDays(res.data.days || []);
+        if (res.data.days?.length > 0) {
+          setExpandedDate(res.data.days[0].date);
+        }
+      }
+    } catch (_) {
+      toast.error('Failed to load archived bookings.');
+    } finally {
+      setLoadingOldBookings(false);
     }
   };
 
@@ -171,11 +194,19 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
 
   // Manual Check-In from attendance bar
   const handleVerifyAndCheckIn = async (codeToVerify: string) => {
-    const code = codeToVerify.trim().toUpperCase();
-    if (!code) {
+    const raw = codeToVerify.trim();
+    if (!raw) {
       toast.error('Please enter a valid Booking Pass Code.');
       return;
     }
+
+    let code = raw;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.code) code = parsed.code.trim();
+      else if (parsed.bookingCode) code = parsed.bookingCode.trim();
+      else if (parsed.id) code = parsed.id.trim();
+    } catch (_) {}
 
     setVerifyingCode(true);
     try {
@@ -314,116 +345,38 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
           </div>
         ) : (
           <div className="space-y-4 animate-slide-up">
-            {/* 4-Card Revenue & Occupancy Analytics */}
-            <div className="grid grid-cols-2 gap-2.5">
-              {/* Card 1: Total Revenue (Current Month) */}
-              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-950/60 via-slate-900 to-slate-950 border border-emerald-500/30 space-y-1 relative overflow-hidden shadow-md">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">
-                    Total Revenue
-                  </span>
-                  <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                    <IndianRupee className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="pt-0.5">
-                  <span className="text-lg font-black text-white block">
-                    ₹{(dashboardMetrics?.currentMonthRevenue || 0).toLocaleString('en-IN')}
-                  </span>
-                  <span className="text-[9px] text-emerald-400 font-semibold block">
-                    {dashboardMetrics?.currentMonthName || 'Current Month'} Collection
-                  </span>
-                </div>
-              </div>
-
-              {/* Card 2: Today's Payout / Collection */}
-              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-950/60 via-slate-900 to-slate-950 border border-blue-500/30 space-y-1 relative overflow-hidden shadow-md">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider block">
-                    Today's Payout
-                  </span>
-                  <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
-                    <Wallet className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="pt-0.5">
-                  <span className="text-lg font-black text-white block">
-                    ₹{(dashboardMetrics?.todayRevenue || 0).toLocaleString('en-IN')}
-                  </span>
-                  <span className="text-[9px] text-blue-400 font-semibold block">
-                    Today's Collection
-                  </span>
-                </div>
-              </div>
-
-              {/* Card 3: Live Occupancy */}
-              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-950/60 via-slate-900 to-slate-950 border border-purple-500/30 space-y-1 relative overflow-hidden shadow-md">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block">
-                    Live Occupancy
-                  </span>
-                  <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400">
-                    <Armchair className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="pt-0.5">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-lg font-black text-white">
-                      {dashboardMetrics?.occupiedSeats ?? activeBookingsCount}
-                    </span>
-                    <span className="text-xs text-slate-400 font-bold">
-                      / {dashboardMetrics?.totalSeats ?? (library.seats?.length || library.totalSeats || 0)} Desks
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 pt-0.5">
-                    <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
-                        style={{ width: `${Math.min(100, dashboardMetrics?.occupancyRate || 0)}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-[9px] font-black text-purple-300 font-mono">
-                      {dashboardMetrics?.occupancyRate || 0}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 4: Old Records (Monthly Historical Archive) */}
+            {/* Branch Top Navigation Bar */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <button
                 type="button"
-                onClick={() => setIsOldRecordsModalOpen(true)}
-                className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-950/60 via-slate-900 to-slate-950 border border-amber-500/30 space-y-1 relative overflow-hidden text-left hover:border-amber-500/60 transition active:scale-95 cursor-pointer shadow-md"
+                onClick={() => setIsUnlocked(false)}
+                className="text-amber-400 font-bold flex items-center gap-1.5 text-xs hover:underline cursor-pointer"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">
-                    Old Records
-                  </span>
-                  <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
-                    <History className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="pt-0.5">
-                  <span className="text-lg font-black text-white block">
-                    {dashboardMetrics?.oldRecords?.length || 0} Months
-                  </span>
-                  <span className="text-[9px] text-amber-400 font-bold flex items-center gap-1">
-                    <span>View Archive</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </span>
-                </div>
+                <Lock className="w-3.5 h-3.5" />
+                <span>Lock Console</span>
               </button>
+
+              <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono font-bold text-[10px] flex items-center gap-1">
+                <Unlock className="w-3 h-3 text-emerald-400" />
+                <span>{library.lid || 'LID'} Unlocked</span>
+              </span>
             </div>
 
-            {/* Sub-views Selector */}
-            <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-2xl">
+            {/* Branch Details Header */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-1 shadow-xl">
+              <h2 className="text-lg font-black text-white">{library.name}</h2>
+              <p className="text-[11px] text-slate-400">
+                📍 {library.address}, {library.city}, {library.state}
+              </p>
+            </div>
+
+            {/* Branch Sub-view Toggle */}
+            <div className="grid grid-cols-3 gap-1 p-1 bg-slate-900 rounded-2xl border border-slate-800 text-center font-bold text-[11px]">
               <button
                 type="button"
                 onClick={() => setBranchSubView('metrics')}
-                className={`flex-1 py-2 text-center rounded-xl font-bold transition cursor-pointer ${
-                  branchSubView === 'metrics'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                className={`py-1.5 rounded-xl transition cursor-pointer ${
+                  branchSubView === 'metrics' ? 'bg-amber-600 text-white shadow' : 'text-slate-400'
                 }`}
               >
                 Overview
@@ -431,20 +384,91 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
               <button
                 type="button"
                 onClick={() => setBranchSubView('seats')}
-                className={`flex-1 py-2 text-center rounded-xl font-bold transition cursor-pointer ${
-                  branchSubView === 'seats'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                className={`py-1.5 rounded-xl transition cursor-pointer ${
+                  branchSubView === 'seats' ? 'bg-amber-600 text-white shadow' : 'text-slate-400'
                 }`}
               >
-                Desks Grid ({library.seats?.length || 0})
+                Seat Map
+              </button>
+              <button
+                type="button"
+                onClick={() => setBranchSubView('students')}
+                className={`py-1.5 rounded-xl transition cursor-pointer ${
+                  branchSubView === 'students' ? 'bg-amber-600 text-white shadow' : 'text-slate-400'
+                }`}
+              >
+                Students
               </button>
             </div>
 
-            {/* Sub-view: OVERVIEW */}
+            {/* Sub-view 1: Branch Metrics & Overview */}
             {branchSubView === 'metrics' && (
               <div className="space-y-3">
-                <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2.5">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
+                    <span className="text-[9px] text-slate-400 uppercase font-bold">Net Earnings</span>
+                    <div className="text-lg font-black text-emerald-400">
+                      ₹{(dashboardMetrics?.currentMonthRevenue || 0).toLocaleString('en-IN')}
+                    </div>
+                    <span className="text-[9px] text-slate-500">This branch ({dashboardMetrics?.currentMonthName || 'Month'})</span>
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
+                    <span className="text-[9px] text-slate-400 uppercase font-bold">Today's Payout</span>
+                    <div className="text-lg font-black text-white">
+                      ₹{(dashboardMetrics?.todayRevenue || 0).toLocaleString('en-IN')}
+                    </div>
+                    <span className="text-[9px] text-slate-500">Live Collection</span>
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
+                    <span className="text-[9px] text-slate-400 uppercase font-bold">Live Occupancy</span>
+                    <div className="text-lg font-black text-blue-400">
+                      {dashboardMetrics?.occupancyRate || 0}%
+                    </div>
+                    <span className="text-[9px] text-slate-500">
+                      {dashboardMetrics?.occupiedSeats ?? activeBookingsCount} / {library.seats?.length || library.totalSeats || 0} occupied
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
+                    <span className="text-[9px] text-slate-400 uppercase font-bold">Total Desks</span>
+                    <div className="text-lg font-black text-white">
+                      {library.totalSeats || library.seats?.length || 0}
+                    </div>
+                    <span className="text-[9px] text-slate-500">Capacity</span>
+                  </div>
+                </div>
+
+                {/* Pricing & Memberships Info */}
+                <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl space-y-2">
+                  <span className="font-extrabold text-white text-xs block">Pricing Plans</span>
+                  <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                    <div className="p-2 bg-slate-950 rounded-xl border border-slate-800">
+                      <span className="text-slate-400 block">Hourly</span>
+                      <span className="font-bold text-blue-400">₹{library.hourlyRate}/h</span>
+                    </div>
+                    <div className="p-2 bg-slate-950 rounded-xl border border-slate-800">
+                      <span className="text-slate-400 block">Monthly</span>
+                      <span className="font-bold text-amber-400">
+                        {library.enableMembership !== false && library.enableMonthly !== false
+                          ? `₹${library.monthlyRate || 1200}/m`
+                          : 'Disabled'}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-slate-950 rounded-xl border border-slate-800">
+                      <span className="text-slate-400 block">Yearly VIP</span>
+                      <span className="font-bold text-purple-400">
+                        {library.enableMembership !== false && library.enableYearly !== false
+                          ? `₹${library.yearlyRate || 12000}/y`
+                          : 'Disabled'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Operating Hours & Address */}
+                <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl space-y-2">
                   <span className="font-extrabold text-white text-xs block">Operating Hours & Address</span>
                   <div className="grid grid-cols-2 gap-2 text-slate-300">
                     <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
@@ -452,8 +476,10 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
                       <span className="font-bold text-white">{library.openingTime} - {library.closingTime}</span>
                     </div>
                     <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-                      <span className="text-[9px] text-slate-500 uppercase block">Hourly Fee</span>
-                      <span className="font-bold text-emerald-400">₹{library.hourlyRate}/hr</span>
+                      <span className="text-[9px] text-slate-500 uppercase block">Active Desks</span>
+                      <span className="font-bold text-emerald-400">
+                        {library.seats?.filter((s: any) => s.isAvailable).length || 0} Online
+                      </span>
                     </div>
                   </div>
                   <p className="text-[11px] text-slate-400 pt-1">
@@ -461,38 +487,122 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
                     {library.address}, {library.city}, {library.state}
                   </p>
                 </div>
+
+                {/* Archived Bookings Shortcut */}
+                <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between shadow-md">
+                  <div className="space-y-0.5">
+                    <span className="font-extrabold text-white text-xs block">Old Bookings History</span>
+                    <span className="text-[10px] text-slate-400">Day-by-day past reservations archive</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchOldBookings();
+                      setIsOldBookingsModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold text-xs flex items-center gap-1 transition active:scale-95 cursor-pointer shadow-md"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>View Archive</span>
+                  </button>
+                </div>
               </div>
             )}
 
-            {/* Sub-view: LIVE DESKS GRID */}
+            {/* Sub-view 2: Interactive Visual Seat Map */}
             {branchSubView === 'seats' && (
-              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-extrabold text-white text-xs">Live Seating Layout</span>
-                  <span className="text-[10px] text-slate-400">Tap desk to toggle availability</span>
+                  <span className="font-bold text-white text-xs">Branch Visual Seat Map</span>
+                  <span className="text-[10px] text-slate-400">Tap desk to toggle active</span>
                 </div>
 
-                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-1">
-                  {library.seats?.map((seat: any) => (
-                    <button
-                      key={seat.id}
-                      type="button"
-                      onClick={() => handleToggleSeat(seat.id)}
-                      className={`p-2.5 rounded-xl border text-center transition active:scale-95 cursor-pointer flex flex-col items-center justify-center gap-1 ${
-                        seat.isAvailable
-                          ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/50'
-                          : 'bg-rose-950/40 border-rose-500/50 text-rose-300 hover:bg-rose-900/50'
-                      }`}
-                      title={seat.isAvailable ? 'Desk is Active (Tap to put in maintenance)' : 'Under Maintenance (Tap to enable)'}
+                {library.seatZones && library.seatZones.length > 0 ? (
+                  library.seatZones.map((zone: any) => (
+                    <div key={zone.id} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                      <span className="font-bold text-white text-xs">{zone.name}</span>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        {zone.seats?.map((seat: any) => (
+                          <button
+                            key={seat.id}
+                            type="button"
+                            onClick={() => handleToggleSeat(seat.id)}
+                            className={`p-2 rounded-xl border text-center transition active:scale-95 cursor-pointer ${
+                              seat.isAvailable !== false
+                                ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+                                : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+                            }`}
+                          >
+                            <div className="font-mono font-bold text-xs">{seat.seatNumber}</div>
+                            <div className="text-[9px] mt-0.5 opacity-80">
+                              {seat.isAvailable !== false ? 'AVAILABLE' : 'MAINT.'}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {library.seats?.map((seat: any) => (
+                        <button
+                          key={seat.id}
+                          type="button"
+                          onClick={() => handleToggleSeat(seat.id)}
+                          className={`p-2 rounded-xl border text-center transition active:scale-95 cursor-pointer ${
+                            seat.isAvailable !== false
+                              ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+                              : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+                          }`}
+                        >
+                          <div className="font-mono font-bold text-xs">{seat.seatNumber}</div>
+                          <div className="text-[9px] mt-0.5 opacity-80">
+                            {seat.isAvailable !== false ? 'AVAILABLE' : 'MAINT.'}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sub-view 3: Student Directory */}
+            {branchSubView === 'students' && (
+              <div className="space-y-2.5">
+                <span className="font-bold text-white text-xs block">
+                  Student Directory & Access Records • {library.lid || 'LID'}
+                </span>
+
+                {usersList.length === 0 ? (
+                  <div className="p-8 text-center bg-slate-900 rounded-3xl border border-slate-800 text-slate-400">
+                    <Users className="w-8 h-8 mx-auto text-slate-600 mb-2" />
+                    <p>No active students registered at this branch yet.</p>
+                  </div>
+                ) : (
+                  usersList.map((st: any) => (
+                    <div
+                      key={st.id}
+                      className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between"
                     >
-                      <Armchair className="w-4 h-4" />
-                      <span className="font-mono font-black text-xs">{seat.seatNumber}</span>
-                      <span className="text-[8px] uppercase font-bold">
-                        {seat.isAvailable ? 'Active' : 'Maint.'}
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                          {st.name ? st.name[0].toUpperCase() : 'S'}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-white text-xs">{st.name}</h4>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {st.studentId || st.phone || st.email}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-800 text-emerald-400 text-[10px] font-bold">
+                        {st.totalBookings || 1} Bookings
                       </span>
-                    </button>
-                  ))}
-                </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>
@@ -634,21 +744,35 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
   }
 
   // =========================================================================
-  // TAB 2: MANAGER BOOKINGS (Consolidated strictly for this library)
+  // TAB 2: MANAGER BOOKINGS (Strictly Daily / Today's Bookings)
   // =========================================================================
   if (activeTab === 'manager_bookings') {
     return (
       <div className="space-y-3.5 pb-28 px-4 pt-3 text-xs">
         {/* Header */}
-        <div>
-          <div className="flex items-center gap-1.5 text-blue-400 font-bold uppercase tracking-wider text-[10px]">
-            <CalendarCheck className="w-3.5 h-3.5 text-blue-400" />
-            <span>Branch Reservations</span>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-1.5 text-blue-400 font-bold uppercase tracking-wider text-[10px]">
+              <CalendarCheck className="w-3.5 h-3.5 text-blue-400" />
+              <span>Today's Daily Bookings</span>
+            </div>
+            <h2 className="text-xl font-black text-white tracking-tight">Active Reservations</h2>
+            <span className="text-[10px] text-slate-400">
+              Strictly showing students booked for today in {library.name}
+            </span>
           </div>
-          <h2 className="text-xl font-black text-white tracking-tight">Student Bookings</h2>
-          <span className="text-[10px] text-slate-400">
-            Strictly showing students who booked in {library.name}
-          </span>
+
+          <button
+            type="button"
+            onClick={() => {
+              fetchOldBookings();
+              setIsOldBookingsModalOpen(true);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[10px] flex items-center gap-1 active:scale-95 transition cursor-pointer"
+          >
+            <History className="w-3 h-3" />
+            <span>Old Bookings</span>
+          </button>
         </div>
 
         {/* Search & Filter */}
@@ -675,15 +799,26 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
           </select>
         </div>
 
-        {/* Bookings List */}
+        {/* Daily Bookings List */}
         <div className="space-y-2.5">
           {filteredBookings.length === 0 ? (
             <div className="p-8 text-center bg-slate-900 rounded-3xl border border-slate-800 space-y-2">
               <Calendar className="w-8 h-8 text-slate-600 mx-auto" />
-              <p className="text-white font-bold">No Bookings Found</p>
+              <p className="text-white font-bold">No Daily Bookings for Today</p>
               <p className="text-[11px] text-slate-400">
-                When students reserve desks in {library.name}, their bookings will appear here.
+                When students reserve desks today in {library.name}, their bookings will appear here.
               </p>
+              <button
+                type="button"
+                onClick={() => {
+                  fetchOldBookings();
+                  setIsOldBookingsModalOpen(true);
+                }}
+                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold rounded-xl text-xs transition cursor-pointer"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Browse Old Bookings Archive</span>
+              </button>
             </div>
           ) : (
             filteredBookings.map((b) => (
@@ -1002,6 +1137,29 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
 
       {/* Navigation Actions Menu */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl divide-y divide-slate-800/80">
+        {/* Navigation to Old Bookings Day-by-Day Archive */}
+        <button
+          type="button"
+          onClick={() => {
+            fetchOldBookings();
+            setIsOldBookingsModalOpen(true);
+          }}
+          className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-800/50 transition cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <History className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-bold text-white block">Old Bookings History</span>
+              <span className="text-[10px] text-slate-400">
+                Day-by-day past reservations & collection records
+              </span>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-slate-500" />
+        </button>
+
         <button
           type="button"
           onClick={() => {
@@ -1042,6 +1200,142 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
           <ChevronRight className="w-4 h-4 text-slate-600" />
         </button>
       </div>
+
+      {/* Old Bookings Day-by-Day Historical Archive Modal */}
+      {isOldBookingsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in text-xs">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">Old Bookings History</h3>
+                  <span className="text-[10px] text-slate-400">Day-by-Day Past Records • {library.name}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOldBookingsModalOpen(false)}
+                className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
+              💡 <strong>Auto-Archive:</strong> Har din complete hote hi us din ki saari bookings date ke sath database me automatically archive ho jati hain. Kisi bhi din par tap karke us din ki saari bookings dekhein.
+            </div>
+
+            <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
+              {loadingOldBookings ? (
+                <div className="p-8 text-center space-y-2">
+                  <Loader2 className="w-6 h-6 text-amber-400 animate-spin mx-auto" />
+                  <p className="text-slate-400 text-xs">Loading archived days from database...</p>
+                </div>
+              ) : oldBookingsDays.length === 0 ? (
+                <div className="p-8 text-center bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                  <Archive className="w-8 h-8 text-slate-600 mx-auto" />
+                  <p className="text-white font-bold text-xs">No Past Days Archived Yet</p>
+                  <p className="text-[10px] text-slate-400">
+                    Jaise hi aaj ka din over hoga, us din ki saari bookings date ke sath yahan auto-archive ho jayengi.
+                  </p>
+                </div>
+              ) : (
+                oldBookingsDays.map((day: any) => {
+                  const isExpanded = expandedDate === day.date;
+                  return (
+                    <div
+                      key={day.date}
+                      className="rounded-2xl bg-slate-950 border border-slate-800/80 overflow-hidden transition"
+                    >
+                      {/* Day summary row */}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedDate(isExpanded ? null : day.date)}
+                        className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-900/60 transition cursor-pointer"
+                      >
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                            <span className="font-extrabold text-white text-xs">{day.formattedDate || day.date}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 block">
+                            {day.totalBookings} {day.totalBookings === 1 ? 'Booking' : 'Bookings'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-sm text-emerald-400">
+                            ₹{(day.totalRevenue || 0).toLocaleString('en-IN')}
+                          </span>
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-slate-400" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-slate-400" />
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Expanded Day's Detailed Bookings */}
+                      {isExpanded && (
+                        <div className="p-3 border-t border-slate-900 bg-slate-900/40 space-y-2">
+                          {(!day.bookings || day.bookings.length === 0) ? (
+                            <p className="text-[10px] text-slate-500 italic">No bookings recorded for this day.</p>
+                          ) : (
+                            day.bookings.map((b: any) => (
+                              <div
+                                key={b.id}
+                                className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-white text-xs">{b.user?.name || 'Student'}</span>
+                                    <span className="font-mono text-[9px] text-slate-400">({b.bookingCode})</span>
+                                  </div>
+                                  <span className="px-2 py-0.5 rounded-full bg-blue-600/20 text-blue-300 font-bold text-[9px]">
+                                    Desk {b.seat?.seatNumber || 'N/A'}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                  <span>
+                                    {b.bookingType || 'Hourly'} Pass • {b.startTime && b.endTime ? `${b.startTime}-${b.endTime}` : b.date}
+                                  </span>
+                                  <span className="font-bold text-emerald-400">
+                                    ₹{b.totalAmount || 0} ({b.payment?.paymentStatus || 'PAID'})
+                                  </span>
+                                </div>
+
+                                {b.user?.phone && (
+                                  <div className="text-[9px] text-slate-500">
+                                    📞 {b.user.phone}
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsOldBookingsModalOpen(false)}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold cursor-pointer transition active:scale-95"
+              >
+                Close Old Bookings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

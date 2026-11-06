@@ -3,6 +3,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { toast } from 'react-toastify';
 import confetti from 'canvas-confetti';
 import api from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import {
   X,
   Camera,
@@ -37,6 +38,11 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
   selectedLibraryId,
   onCheckInSuccess,
 }) => {
+  const { user } = useAuth();
+  const isManagerRole = user?.role === 'MANAGER';
+  const verifyEndpoint = isManagerRole ? '/manager/verify-qr' : '/owner/verify-qr';
+  const checkInEndpoint = isManagerRole ? '/manager/check-in' : '/owner/check-in';
+
   const [scanMode, setScanMode] = useState<ScanMode>('CAMERA');
   const [manualCode, setManualCode] = useState('');
   const [verifying, setVerifying] = useState(false);
@@ -174,8 +180,16 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
     await stopCameraStream();
 
     try {
-      const res = await api.post('/owner/verify-qr', {
-        bookingCode: code,
+      let cleanCode = code.trim();
+      try {
+        const parsed = JSON.parse(cleanCode);
+        if (parsed.code) cleanCode = parsed.code.trim();
+        else if (parsed.bookingCode) cleanCode = parsed.bookingCode.trim();
+        else if (parsed.id) cleanCode = parsed.id.trim();
+      } catch (_) {}
+
+      const res = await api.post(verifyEndpoint, {
+        bookingCode: cleanCode,
         libraryId: selectedLibraryId || undefined,
       });
 
@@ -217,9 +231,10 @@ export const MobileScannerModal: React.FC<MobileScannerModalProps> = ({
     if (!verifiedBooking) return;
     setCheckingIn(true);
     try {
-      const res = await api.post('/owner/check-in', {
+      const res = await api.post(checkInEndpoint, {
         bookingId: verifiedBooking.id,
         bookingCode: verifiedBooking.bookingCode,
+        libraryId: selectedLibraryId || undefined,
       });
 
       if (res.data.success) {

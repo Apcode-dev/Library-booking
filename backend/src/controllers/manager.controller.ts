@@ -33,7 +33,13 @@ export class ManagerController {
       const library = await prisma.library.findUnique({
         where: { id: manager.assignedLibraryId },
         include: {
-          seatZones: true,
+          seatZones: {
+            include: {
+              seats: {
+                orderBy: { seatNumber: 'asc' },
+              },
+            },
+          },
           seats: {
             orderBy: { seatNumber: 'asc' },
           },
@@ -203,7 +209,8 @@ export class ManagerController {
   }
 
   /**
-   * Get Consolidated Bookings strictly for the Manager's Assigned Library
+   * Get Daily Bookings strictly for the Manager's Assigned Library
+   * (Returns today's daily active bookings only by default)
    */
   static async getBookings(req: Request, res: Response): Promise<void> {
     try {
@@ -217,8 +224,22 @@ export class ManagerController {
         return;
       }
 
+      const scope = (req.query.scope as string) || 'daily';
+      const todayDateStr = new Date().toLocaleDateString('en-CA');
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const whereClause: any = { libraryId: manager.assignedLibraryId };
+      if (scope !== 'all') {
+        // Daily bookings only
+        whereClause.OR = [
+          { date: todayDateStr },
+          { createdAt: { gte: startOfDay } },
+        ];
+      }
+
       const bookings = await prisma.booking.findMany({
-        where: { libraryId: manager.assignedLibraryId },
+        where: whereClause,
         include: {
           user: { select: { id: true, name: true, email: true, phone: true, studentId: true } },
           seat: { select: { id: true, seatNumber: true, seatType: true } },
@@ -227,9 +248,133 @@ export class ManagerController {
         orderBy: { createdAt: 'desc' },
       });
 
-      res.json({ success: true, bookings });
+      res.json({ success: true, todayDate: todayDateStr, count: bookings.length, bookings });
     } catch (error: any) {
       res.status(500).json({ success: false, message: 'Failed to fetch bookings', error: error.message });
+    }
+  }
+
+  /**
+   * Get Daily Bookings specifically
+   */
+  static async getDailyBookings(req: Request, res: Response): Promise<void> {
+    req.query.scope = 'daily';
+    return ManagerController.getBookings(req, res);
+  }
+
+  /**
+   * Get Old Bookings (Day-by-Day Historical Archive with auto-archival into database)
+   */
+  static async getOldBookings(req: Request, res: Response): Promise<void> {
+    try {
+      const manager = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: { assignedLibraryId: true },
+      });
+
+      if (!manager || !manager.assignedLibraryId) {
+        res.status(403).json({ success: false, message: 'No assigned library found.' });
+        return;
+      }
+
+      const libraryId = manager.assignedLibraryId;
+      const todayDateStr = new Date().toLocaleDateString('en-CA');
+
+      // 1. Fetch past bookings prior to today for this library
+      const pastBookings = await prisma.booking.findMany({
+        where: {
+          libraryId,
+          date: { lt: todayDateStr },
+        },
+        include: {
+          user: { select: { id: true, name: true, email: true, phone: true, studentId: true } },
+          seat: { select: { id: true, seatNumber: true, seatType: true } },
+          payment: true,
+        },
+        orderBy: { date: 'desc' },
+      });
+
+      // Group past bookings by date
+      const dateMap = new Map<string, typeof pastBookings>();
+      for (const b of pastBookings) {
+        const bDate = b.date || b.createdAt.toISOString().split('T')[0];
+        if (!dateMap.has(bDate)) {
+          dateMap.set(bDate, []);
+        }
+        dateMap.get(bDate)!.push(b);
+      }
+
+      // 2. Auto-archive: Upsert each past day into ArchivedDailyBooking table
+      for (const [dateStr, dayBookings] of dateMap.entries()) {
+        const dayRevenue = dayBookings.reduce(
+          (sum, b) => sum + (b.payment?.amount || b.totalAmount || 0),
+          0
+        );
+
+        await prisma.archivedDailyBooking.upsert({
+          where: {
+            libraryId_date: {
+              libraryId,
+              date: dateStr,
+            },
+          },
+          update: {
+            totalBookings: dayBookings.length,
+            totalRevenue: dayRevenue,
+            bookingsData: JSON.stringify(dayBookings),
+          },
+          create: {
+            libraryId,
+            date: dateStr,
+            totalBookings: dayBookings.length,
+            totalRevenue: dayRevenue,
+            bookingsData: JSON.stringify(dayBookings),
+          },
+        });
+      }
+
+      // 3. Query all archived daily records from database table
+      const archivedRecords = await prisma.archivedDailyBooking.findMany({
+        where: { libraryId },
+        orderBy: { date: 'desc' },
+      });
+
+      const days = archivedRecords.map((rec) => {
+        let bookings: any[] = [];
+        try {
+          bookings = JSON.parse(rec.bookingsData);
+        } catch (_) {}
+
+        const parsedDate = new Date(rec.date);
+        const formattedDate = !isNaN(parsedDate.getTime())
+          ? parsedDate.toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })
+          : rec.date;
+
+        return {
+          id: rec.id,
+          date: rec.date,
+          formattedDate,
+          totalBookings: rec.totalBookings,
+          totalRevenue: rec.totalRevenue,
+          bookings,
+        };
+      });
+
+      res.json({
+        success: true,
+        daysCount: days.length,
+        days,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch old bookings archive',
+        error: error.message,
+      });
     }
   }
 
@@ -352,7 +497,13 @@ export class ManagerController {
       }
 
       const { bookingId, bookingCode } = req.body;
-      const codeOrId = (bookingCode || bookingId || '').trim();
+      let codeOrId = (bookingCode || bookingId || '').trim();
+      try {
+        const parsed = JSON.parse(codeOrId);
+        if (parsed.code) codeOrId = parsed.code.trim();
+        else if (parsed.bookingCode) codeOrId = parsed.bookingCode.trim();
+        else if (parsed.id) codeOrId = parsed.id.trim();
+      } catch (_) {}
 
       const booking = await prisma.booking.findFirst({
         where: {

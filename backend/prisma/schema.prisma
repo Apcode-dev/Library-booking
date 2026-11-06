@@ -116,6 +116,7 @@ model Library {
   reviews         Review[]
   attendances     Attendance[]
   managers        User[]      @relation("LibraryManagers")
+  archivedDailyBookings ArchivedDailyBooking[]
 
   @@index([city])
   @@index([state])
@@ -272,3 +273,20 @@ model Attendance {
   @@index([libraryId])
   @@index([date])
 }
+
+model ArchivedDailyBooking {
+  id            String   @id @default(uuid())
+  libraryId     String
+  date          String   // e.g. "2026-11-05"
+  totalBookings Int      @default(0)
+  totalRevenue  Float    @default(0)
+  bookingsData  String   // JSON string containing detailed array of bookings for this day
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  library       Library  @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+
+  @@unique([libraryId, date])
+  @@index([libraryId, date])
+}
+
