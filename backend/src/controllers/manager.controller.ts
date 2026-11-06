@@ -30,17 +30,52 @@ export class ManagerController {
         return;
       }
 
+      const now = new Date();
       const library = await prisma.library.findUnique({
         where: { id: manager.assignedLibraryId },
         include: {
           seatZones: {
             include: {
               seats: {
+                include: {
+                  bookings: {
+                    where: {
+                      status: { in: ['CONFIRMED', 'CHECKED_IN', 'ACTIVE'] },
+                    },
+                    include: {
+                      user: { select: { name: true, email: true } },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                  },
+                  seatLocks: {
+                    where: {
+                      status: 'ACTIVE',
+                      expiresAt: { gt: now },
+                    },
+                  },
+                },
                 orderBy: { seatNumber: 'asc' },
               },
             },
           },
           seats: {
+            include: {
+              bookings: {
+                where: {
+                  status: { in: ['CONFIRMED', 'CHECKED_IN', 'ACTIVE'] },
+                },
+                include: {
+                  user: { select: { name: true, email: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+              },
+              seatLocks: {
+                where: {
+                  status: 'ACTIVE',
+                  expiresAt: { gt: now },
+                },
+              },
+            },
             orderBy: { seatNumber: 'asc' },
           },
         },
@@ -55,7 +90,6 @@ export class ManagerController {
       }
 
       const todayDateStr = new Date().toLocaleDateString('en-CA');
-      const now = new Date();
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth(); // 0-indexed
       const currentMonthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
@@ -139,6 +173,44 @@ export class ManagerController {
       const liveOccupiedSeats = activeRightNow > 0 ? activeRightNow : activeBookings;
       const occupancyRate = totalSeats > 0 ? Math.min(100, Math.round((liveOccupiedSeats / totalSeats) * 100)) : 0;
 
+      const formatSeat = (seat: any) => {
+        const activeBooking = seat.bookings?.[0];
+        const activeLock = seat.seatLocks?.[0];
+        let computedStatus = 'AVAILABLE';
+        if (!seat.isAvailable) {
+          computedStatus = 'MAINTENANCE';
+        } else if (activeBooking?.status === 'CHECKED_IN' || activeBooking?.status === 'ACTIVE') {
+          computedStatus = 'CHECKED_IN';
+        } else if (activeBooking?.status === 'CONFIRMED') {
+          computedStatus = 'BOOKED';
+        } else if (activeLock) {
+          computedStatus = 'LOCKED';
+        }
+
+        return {
+          id: seat.id,
+          seatNumber: seat.seatNumber,
+          seatType: seat.seatType,
+          category: seat.category || 'HOURLY',
+          hourlyPrice: seat.hourlyPrice,
+          hasPowerSocket: seat.hasPowerSocket,
+          hasLamp: seat.hasLamp,
+          isAvailable: seat.isAvailable,
+          libraryId: seat.libraryId,
+          seatZoneId: seat.seatZoneId,
+          status: computedStatus,
+          activeStudentName: activeBooking?.user?.name || null,
+          activeBookingCode: activeBooking?.bookingCode || null,
+        };
+      };
+
+      const formattedSeatZones = (library.seatZones || []).map((zone) => ({
+        ...zone,
+        seats: (zone.seats || []).map(formatSeat),
+      }));
+
+      const formattedDirectSeats = (library.seats || []).map(formatSeat);
+
       res.json({
         success: true,
         manager: {
@@ -152,6 +224,8 @@ export class ManagerController {
           ...library,
           photos: JSON.parse(library.photos || '[]'),
           facilities: JSON.parse(library.facilities || '[]'),
+          seatZones: formattedSeatZones,
+          seats: formattedDirectSeats,
         },
         todayCheckIns,
         activeBookings,
@@ -159,10 +233,10 @@ export class ManagerController {
           todayRevenue: Math.round(todayRevenue * 100) / 100,
           currentMonthRevenue: Math.round(currentMonthRevenue * 100) / 100,
           currentMonthName: `${monthNames[currentMonth]} ${currentYear}`,
-          totalSeats,
-          occupiedSeats: liveOccupiedSeats,
-          occupancyRate,
-          oldRecords,
+          totalSeats: totalSeats || library.totalSeats || 0,
+          occupiedSeats: liveOccupiedSeats || 0,
+          occupancyRate: occupancyRate || 0,
+          oldRecords: oldRecords || [],
         },
       });
     } catch (error: any) {
@@ -553,6 +627,8 @@ export class ManagerController {
           libraryId: booking.libraryId,
           date: todayDateStr,
           checkInTime: now,
+          passType: booking.bookingType || 'HOURLY',
+          seatNumber: booking.seat?.seatNumber || null,
         },
       });
 

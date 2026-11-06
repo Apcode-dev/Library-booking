@@ -48,12 +48,14 @@ interface MobileManagerScreenProps {
   onOpenAuth: () => void;
   activeTab?: string;
   onNavigateTab?: (tab: string) => void;
+  onLogout?: () => void;
 }
 
 export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
   onOpenAuth,
   activeTab = 'manager_dashboard',
   onNavigateTab,
+  onLogout,
 }) => {
   const { user, logout } = useAuth();
 
@@ -284,6 +286,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
           type="button"
           onClick={() => {
             logout();
+            onLogout?.();
           }}
           className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold cursor-pointer transition active:scale-95"
         >
@@ -517,50 +520,89 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
                   <span className="text-[10px] text-slate-400">Tap desk to toggle active</span>
                 </div>
 
-                {library.seatZones && library.seatZones.length > 0 ? (
+                {library.seatZones && library.seatZones.some((z: any) => (z.seats?.length || 0) > 0) ? (
                   library.seatZones.map((zone: any) => (
                     <div key={zone.id} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
-                      <span className="font-bold text-white text-xs">{zone.name}</span>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white text-xs">{zone.name}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {zone.seats?.length || 0} Desks
+                        </span>
+                      </div>
                       <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                        {zone.seats?.map((seat: any) => (
+                        {(zone.seats || []).map((seat: any) => {
+                          const isBooked = seat.status === 'BOOKED' || seat.status === 'CHECKED_IN';
+                          const isAvailable = seat.status === 'AVAILABLE' || (!isBooked && seat.isAvailable !== false);
+                          return (
+                            <button
+                              key={seat.id}
+                              type="button"
+                              onClick={() => handleToggleSeat(seat.id)}
+                              className={`p-2 rounded-xl border text-center transition active:scale-95 cursor-pointer ${
+                                isBooked
+                                  ? 'bg-blue-950/40 border-blue-500/50 text-blue-300'
+                                  : isAvailable
+                                  ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+                                  : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+                              }`}
+                            >
+                              <div className="font-mono font-bold text-xs">{seat.seatNumber}</div>
+                              <div className="text-[9px] mt-0.5 opacity-80 uppercase">
+                                {seat.status || (seat.isAvailable !== false ? 'AVAILABLE' : 'MAINT.')}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
+                ) : (library.seats && library.seats.length > 0) ? (
+                  <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white text-xs">Standard Seating Desks</span>
+                      <span className="text-[10px] text-slate-400 font-mono">{library.seats.length} Desks</span>
+                    </div>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {library.seats.map((seat: any) => {
+                        const isBooked = seat.status === 'BOOKED' || seat.status === 'CHECKED_IN';
+                        const isAvailable = seat.status === 'AVAILABLE' || (!isBooked && seat.isAvailable !== false);
+                        return (
                           <button
                             key={seat.id}
                             type="button"
                             onClick={() => handleToggleSeat(seat.id)}
                             className={`p-2 rounded-xl border text-center transition active:scale-95 cursor-pointer ${
-                              seat.isAvailable !== false
+                              isBooked
+                                ? 'bg-blue-950/40 border-blue-500/50 text-blue-300'
+                                : isAvailable
                                 ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
                                 : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
                             }`}
                           >
                             <div className="font-mono font-bold text-xs">{seat.seatNumber}</div>
-                            <div className="text-[9px] mt-0.5 opacity-80">
-                              {seat.isAvailable !== false ? 'AVAILABLE' : 'MAINT.'}
+                            <div className="text-[9px] mt-0.5 opacity-80 uppercase">
+                              {seat.status || (seat.isAvailable !== false ? 'AVAILABLE' : 'MAINT.')}
                             </div>
                           </button>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
-                  ))
+                  </div>
                 ) : (
                   <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white text-xs">Desks Layout</span>
+                      <span className="text-[10px] text-slate-400 font-mono">{library.totalSeats || 20} Desks</span>
+                    </div>
                     <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                      {library.seats?.map((seat: any) => (
-                        <button
-                          key={seat.id}
-                          type="button"
-                          onClick={() => handleToggleSeat(seat.id)}
-                          className={`p-2 rounded-xl border text-center transition active:scale-95 cursor-pointer ${
-                            seat.isAvailable !== false
-                              ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
-                              : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
-                          }`}
+                      {Array.from({ length: library.totalSeats || 20 }).map((_, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2 rounded-xl border text-center bg-emerald-950/40 border-emerald-500/50 text-emerald-300"
                         >
-                          <div className="font-mono font-bold text-xs">{seat.seatNumber}</div>
-                          <div className="text-[9px] mt-0.5 opacity-80">
-                            {seat.isAvailable !== false ? 'AVAILABLE' : 'MAINT.'}
-                          </div>
-                        </button>
+                          <div className="font-mono font-bold text-xs">S-{String(idx + 1).padStart(2, '0')}</div>
+                          <div className="text-[9px] mt-0.5 opacity-80">AVAILABLE</div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -1184,6 +1226,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
           type="button"
           onClick={() => {
             logout();
+            onLogout?.();
             toast.success('Manager session signed out successfully.');
           }}
           className="w-full p-3.5 flex items-center justify-between text-left hover:bg-rose-950/20 transition cursor-pointer active:scale-95"

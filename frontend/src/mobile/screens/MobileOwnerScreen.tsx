@@ -44,12 +44,14 @@ interface MobileOwnerScreenProps {
   onOpenAuth: () => void;
   activeTab?: string;
   onNavigateTab?: (tab: string) => void;
+  onLogout?: () => void;
 }
 
 export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
   onOpenAuth,
   activeTab = 'owner_dashboard',
   onNavigateTab,
+  onLogout,
 }) => {
   const { user, logout, updateProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -196,6 +198,55 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
       return matchesSearch && matchesBranch && matchesType;
     });
   }, [studentsData, bookingSearch, bookingFilterBranch, bookingFilterType]);
+
+  // Dedicated Branch Metrics for the Unlocked / Selected Branch
+  const branchMetrics = useMemo(() => {
+    if (!selectedBranch) return null;
+    const branchBookings = (studentsData.dailyBookings || []).concat(studentsData.premiumPasses || []).filter(
+      (b: any) => b.libraryId === selectedBranch.id
+    );
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    let currentMonthRevenue = 0;
+    let todayRevenue = 0;
+    let activeNow = 0;
+
+    branchBookings.forEach((b: any) => {
+      const amount = b.payment?.amount || b.totalAmount || 0;
+      const bDateStr = b.date || (b.createdAt ? new Date(b.createdAt).toLocaleDateString('en-CA') : '');
+      const bMonthKey = bDateStr.slice(0, 7);
+
+      if (bDateStr === todayStr) {
+        todayRevenue += amount;
+      }
+      if (bMonthKey === currentMonthKey) {
+        currentMonthRevenue += amount;
+      }
+
+      if (b.status === 'CHECKED_IN' || b.status === 'CONFIRMED' || b.status === 'ACTIVE') {
+        const start = b.startDateTime ? new Date(b.startDateTime) : null;
+        const end = b.endDateTime ? new Date(b.endDateTime) : null;
+        if (start && end && start <= now && end >= now) {
+          activeNow += 1;
+        } else if (b.status === 'CHECKED_IN') {
+          activeNow += 1;
+        }
+      }
+    });
+
+    const totalSeats = selectedBranch.seats?.length || selectedBranch.totalSeats || 0;
+    const occupancyRate = totalSeats > 0 ? Math.min(100, Math.round((activeNow / totalSeats) * 100)) : 0;
+
+    return {
+      currentMonthRevenue,
+      todayRevenue,
+      activeNow,
+      occupancyRate,
+      totalSeats,
+    };
+  }, [selectedBranch, studentsData]);
 
   // Verification & Check-in Handler
   const handleVerifyAndCheckIn = async (codeToVerify: string) => {
@@ -693,28 +744,34 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
                   <span className="text-[9px] text-slate-400 uppercase font-bold">Net Earnings</span>
                   <div className="text-lg font-black text-emerald-400">
-                    ₹{metrics?.totalOwnerEarnings || 0}
+                    ₹{(branchMetrics?.currentMonthRevenue ?? metrics?.totalOwnerEarnings ?? 0).toLocaleString('en-IN')}
                   </div>
                   <span className="text-[9px] text-slate-500">This branch</span>
                 </div>
 
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
                   <span className="text-[9px] text-slate-400 uppercase font-bold">Today's Payout</span>
-                  <div className="text-lg font-black text-white">₹{metrics?.todayEarnings || 0}</div>
+                  <div className="text-lg font-black text-white">
+                    ₹{(branchMetrics?.todayRevenue ?? metrics?.todayEarnings ?? 0).toLocaleString('en-IN')}
+                  </div>
                   <span className="text-[9px] text-slate-500">Live</span>
                 </div>
 
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
                   <span className="text-[9px] text-slate-400 uppercase font-bold">Live Occupancy</span>
                   <div className="text-lg font-black text-blue-400">
-                    {metrics?.occupancyRate || 0}%
+                    {branchMetrics?.occupancyRate ?? metrics?.occupancyRate ?? 0}%
                   </div>
-                  <span className="text-[9px] text-slate-500">Desks occupied</span>
+                  <span className="text-[9px] text-slate-500">
+                    {branchMetrics?.activeNow ?? 0} / {branchMetrics?.totalSeats ?? selectedBranch.totalSeats ?? 0} occupied
+                  </span>
                 </div>
 
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
                   <span className="text-[9px] text-slate-400 uppercase font-bold">Total Desks</span>
-                  <div className="text-lg font-black text-white">{selectedBranch.totalSeats}</div>
+                  <div className="text-lg font-black text-white">
+                    {selectedBranch.seats?.length || selectedBranch.totalSeats || 0}
+                  </div>
                   <span className="text-[9px] text-slate-500">Capacity</span>
                 </div>
               </div>
@@ -756,35 +813,91 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
                 <span className="text-[10px] text-slate-400">Tap desk to toggle active</span>
               </div>
 
-              {selectedBranch.seatZones && selectedBranch.seatZones.length > 0 ? (
+              {selectedBranch.seatZones && selectedBranch.seatZones.some((z) => (z.seats?.length || 0) > 0) ? (
                 selectedBranch.seatZones.map((zone) => (
                   <div key={zone.id} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
-                    <span className="font-bold text-white text-xs">{zone.name}</span>
-                    <div className="grid grid-cols-4 gap-2">
-                      {zone.seats?.map((seat) => (
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white text-xs">{zone.name}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {zone.seats?.length || 0} Desks
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {(zone.seats || []).map((seat) => {
+                        const isBooked = seat.status === 'BOOKED' || seat.status === 'CHECKED_IN';
+                        const isAvailable = seat.status === 'AVAILABLE' || (!isBooked && seat.isAvailable !== false);
+                        return (
+                          <button
+                            key={seat.id}
+                            type="button"
+                            onClick={() => handleToggleSeat(seat.id)}
+                            className={`p-2 rounded-xl border text-center transition active:scale-95 cursor-pointer ${
+                              isBooked
+                                ? 'bg-blue-950/40 border-blue-500/50 text-blue-300'
+                                : isAvailable
+                                ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+                                : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+                            }`}
+                          >
+                            <div className="font-mono font-bold text-xs">{seat.seatNumber}</div>
+                            <div className="text-[9px] mt-0.5 opacity-80 uppercase">
+                              {seat.status || (seat.isAvailable !== false ? 'AVAILABLE' : 'MAINT.')}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              ) : (selectedBranch.seats && selectedBranch.seats.length > 0) ? (
+                <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white text-xs">Standard Seating Desks</span>
+                    <span className="text-[10px] text-slate-400 font-mono">{selectedBranch.seats.length} Desks</span>
+                  </div>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                    {selectedBranch.seats.map((seat: any) => {
+                      const isBooked = seat.status === 'BOOKED' || seat.status === 'CHECKED_IN';
+                      const isAvailable = seat.status === 'AVAILABLE' || (!isBooked && seat.isAvailable !== false);
+                      return (
                         <button
                           key={seat.id}
                           type="button"
                           onClick={() => handleToggleSeat(seat.id)}
                           className={`p-2 rounded-xl border text-center transition active:scale-95 cursor-pointer ${
-                            seat.status === 'AVAILABLE'
-                              ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
-                              : seat.status === 'BOOKED'
+                            isBooked
                               ? 'bg-blue-950/40 border-blue-500/50 text-blue-300'
-                              : 'bg-slate-950 border-slate-800 text-slate-500'
+                              : isAvailable
+                              ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+                              : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
                           }`}
                         >
                           <div className="font-mono font-bold text-xs">{seat.seatNumber}</div>
-                          <div className="text-[9px] mt-0.5 opacity-80">{seat.status}</div>
+                          <div className="text-[9px] mt-0.5 opacity-80 uppercase">
+                            {seat.status || (seat.isAvailable !== false ? 'AVAILABLE' : 'MAINT.')}
+                          </div>
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                ))
+                </div>
               ) : (
-                <div className="p-8 text-center bg-slate-900 rounded-3xl border border-slate-800 text-slate-400">
-                  <Armchair className="w-8 h-8 mx-auto text-slate-600 mb-2" />
-                  <p>All {selectedBranch.totalSeats} desks are configured in standard grid layout.</p>
+                <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white text-xs">Desks Layout</span>
+                    <span className="text-[10px] text-slate-400 font-mono">{selectedBranch.totalSeats} Desks</span>
+                  </div>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                    {Array.from({ length: selectedBranch.totalSeats || 20 }).map((_, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2 rounded-xl border text-center bg-emerald-950/40 border-emerald-500/50 text-emerald-300"
+                      >
+                        <div className="font-mono font-bold text-xs">S-{String(idx + 1).padStart(2, '0')}</div>
+                        <div className="text-[9px] mt-0.5 opacity-80">AVAILABLE</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -1286,6 +1399,7 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
           onClick={() => {
             if (confirm('Are you sure you want to log out of the Owner Console?')) {
               logout();
+              onLogout?.();
               toast.success('Owner session signed out.');
             }
           }}

@@ -245,12 +245,22 @@ export const MobileAppShell: React.FC = () => {
             activeTab={activeTab}
             onNavigateTab={(tab) => setActiveTab(tab as MobileTab)}
             onOpenAuth={() => openAuth('OWNER')}
+            onLogout={() => {
+              setHasDismissedWelcome(false);
+              setActiveTab('explore');
+              setSelectedLibrary(null);
+            }}
           />
         ) : activeTab.startsWith('owner_') ? (
           <MobileOwnerScreen
             activeTab={activeTab}
             onNavigateTab={(tab) => setActiveTab(tab as MobileTab)}
             onOpenAuth={() => openAuth('OWNER')}
+            onLogout={() => {
+              setHasDismissedWelcome(false);
+              setActiveTab('explore');
+              setSelectedLibrary(null);
+            }}
           />
         ) : activeTab.startsWith('admin_') ? (
           <MobileAdminScreen

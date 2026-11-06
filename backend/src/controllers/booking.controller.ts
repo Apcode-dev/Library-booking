@@ -726,6 +726,7 @@ export class BookingController {
       res.json({
         success: true,
         attendances,
+        attendance: attendances,
       });
     } catch (error: any) {
       res.status(500).json({ success: false, message: 'Failed to fetch attendance history', error: error.message });
@@ -751,6 +752,7 @@ export class BookingController {
       res.json({
         success: true,
         attendances,
+        attendance: attendances,
       });
     } catch (error: any) {
       res.status(500).json({ success: false, message: 'Failed to fetch pass attendance', error: error.message });

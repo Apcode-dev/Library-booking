@@ -50,7 +50,7 @@ export const MobilePassesScreen: React.FC<MobilePassesScreenProps> = ({
         setBookings(bookingsRes.data.bookings || []);
       }
       if (attendanceRes.data.success) {
-        setAttendanceLogs(attendanceRes.data.attendance || []);
+        setAttendanceLogs(attendanceRes.data.attendances || attendanceRes.data.attendance || []);
       }
     } catch (_) {
     } finally {
