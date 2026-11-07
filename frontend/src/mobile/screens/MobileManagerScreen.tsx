@@ -28,6 +28,7 @@ import {
   UserCheck,
   KeyRound,
   Edit2,
+  Crown,
   LogOut,
   HelpCircle,
   ChevronRight,
@@ -134,14 +135,16 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
     setLoadingOldBookings(true);
     try {
       const res = await api.get('/manager/bookings/old');
-      if (res.data.success) {
+      if (res.data?.success) {
         setOldBookingsDays(res.data.days || []);
         if (res.data.days?.length > 0) {
           setExpandedDate(res.data.days[0].date);
         }
+      } else {
+        toast.error(res.data?.message || 'Failed to load archived bookings.');
       }
-    } catch (_) {
-      toast.error('Failed to load archived bookings.');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to load archived bookings.');
     } finally {
       setLoadingOldBookings(false);
     }
@@ -169,6 +172,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
         setIsUnlocked(true);
         setIsPinModalOpen(false);
         setPinInput('');
+        fetchManagerData();
       } else {
         toast.error(res.data.message || 'Incorrect PIN');
       }
@@ -264,6 +268,103 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
       );
     });
   }, [usersList, userSearch]);
+
+  // Categorized seats (Divided into Hourly Study Desks, Monthly Pass Desks, and Yearly VIP Desks like Owner side)
+  const seatCategories = useMemo(() => {
+    if (!library) return [];
+
+    // Check if library has seatZones with populated seats
+    if (library.seatZones && library.seatZones.some((z: any) => (z.seats?.length || 0) > 0)) {
+      return library.seatZones
+        .filter((z: any) => (z.seats?.length || 0) > 0)
+        .map((zone: any) => {
+          let icon = 'clock';
+          let tag = 'HOURLY';
+          const nameLower = (zone.name || '').toLowerCase();
+          if (nameLower.includes('yearly') || nameLower.includes('vip')) {
+            icon = 'crown_yearly';
+            tag = 'YEARLY VIP';
+          } else if (nameLower.includes('monthly') || nameLower.includes('pass')) {
+            icon = 'crown_monthly';
+            tag = 'MONTHLY PASS';
+          }
+          return {
+            id: zone.id,
+            name: zone.name,
+            icon,
+            tag,
+            seats: zone.seats || [],
+          };
+        });
+    }
+
+    // Fallback: Group seats by category or prefix (H-, M-, Y-) from library.seats
+    const allSeats = library.seats || [];
+    if (allSeats.length === 0) return [];
+
+    const hourlySeats = allSeats.filter((s: any) => {
+      const cat = (s.category || '').toUpperCase();
+      const num = s.seatNumber || '';
+      return (
+        cat === 'HOURLY' ||
+        num.startsWith('H-') ||
+        (!num.startsWith('M-') && !num.startsWith('Y-') && cat !== 'MONTHLY' && cat !== 'YEARLY')
+      );
+    });
+
+    const monthlySeats = allSeats.filter((s: any) => {
+      const cat = (s.category || '').toUpperCase();
+      const num = s.seatNumber || '';
+      return cat === 'MONTHLY' || num.startsWith('M-');
+    });
+
+    const yearlySeats = allSeats.filter((s: any) => {
+      const cat = (s.category || '').toUpperCase();
+      const num = s.seatNumber || '';
+      return cat === 'YEARLY' || num.startsWith('Y-');
+    });
+
+    const groups: any[] = [];
+    if (hourlySeats.length > 0) {
+      groups.push({
+        id: 'cat_hourly',
+        name: '⏱️ Hourly Study Desks',
+        icon: 'clock',
+        tag: 'HOURLY',
+        seats: hourlySeats,
+      });
+    }
+    if (monthlySeats.length > 0) {
+      groups.push({
+        id: 'cat_monthly',
+        name: '👑 Monthly Pass Desks',
+        icon: 'crown_monthly',
+        tag: 'MONTHLY PASS',
+        seats: monthlySeats,
+      });
+    }
+    if (yearlySeats.length > 0) {
+      groups.push({
+        id: 'cat_yearly',
+        name: '👑 Yearly VIP Desks',
+        icon: 'crown_yearly',
+        tag: 'YEARLY VIP',
+        seats: yearlySeats,
+      });
+    }
+
+    return groups.length > 0
+      ? groups
+      : [
+          {
+            id: 'cat_default',
+            name: 'Standard Seating Desks',
+            icon: 'clock',
+            tag: 'STANDARD',
+            seats: allSeats,
+          },
+        ];
+  }, [library]);
 
   if (loading) {
     return (
@@ -516,97 +617,104 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
             {branchSubView === 'seats' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-white text-xs">Branch Visual Seat Map</span>
-                  <span className="text-[10px] text-slate-400">Tap desk to toggle active</span>
+                  <div>
+                    <span className="font-bold text-white text-xs block">Branch Visual Seat Map</span>
+                    <span className="text-[10px] text-slate-400">Divided by Plan Category • Tap to toggle active</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-900 border border-slate-800 rounded-lg text-emerald-400 font-bold">
+                    {library.seats?.filter((s: any) => s.isAvailable !== false).length || 0} / {library.seats?.length || library.totalSeats || 0} Active
+                  </span>
                 </div>
 
-                {library.seatZones && library.seatZones.some((z: any) => (z.seats?.length || 0) > 0) ? (
-                  library.seatZones.map((zone: any) => (
-                    <div key={zone.id} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-white text-xs">{zone.name}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {zone.seats?.length || 0} Desks
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                        {(zone.seats || []).map((seat: any) => {
-                          const isBooked = seat.status === 'BOOKED' || seat.status === 'CHECKED_IN';
-                          const isAvailable = seat.status === 'AVAILABLE' || (!isBooked && seat.isAvailable !== false);
-                          return (
-                            <button
-                              key={seat.id}
-                              type="button"
-                              onClick={() => handleToggleSeat(seat.id)}
-                              className={`p-2 rounded-xl border text-center transition active:scale-95 cursor-pointer ${
-                                isBooked
-                                  ? 'bg-blue-950/40 border-blue-500/50 text-blue-300'
-                                  : isAvailable
-                                  ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
-                                  : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
-                              }`}
-                            >
-                              <div className="font-mono font-bold text-xs">{seat.seatNumber}</div>
-                              <div className="text-[9px] mt-0.5 opacity-80 uppercase">
-                                {seat.status || (seat.isAvailable !== false ? 'AVAILABLE' : 'MAINT.')}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))
-                ) : (library.seats && library.seats.length > 0) ? (
-                  <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                {/* Color Legend Banner (Matching Owner Console) */}
+                <div className="flex flex-wrap gap-1.5 p-2.5 bg-slate-900 border border-slate-800 rounded-2xl text-[9px] font-bold">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Available
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-950/60 text-blue-400 border border-blue-800/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                    Booked
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-950/60 text-purple-400 border border-purple-800/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                    Checked-In
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-950/60 text-amber-400 border border-amber-800/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    5m Hold
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-800/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                    Maint.
+                  </span>
+                </div>
+
+                {seatCategories.map((categoryGroup: any) => (
+                  <div key={categoryGroup.id} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-white text-xs">Standard Seating Desks</span>
-                      <span className="text-[10px] text-slate-400 font-mono">{library.seats.length} Desks</span>
+                      <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                        {categoryGroup.icon === 'crown_monthly' ? (
+                          <Crown className="w-3.5 h-3.5 text-amber-400" />
+                        ) : categoryGroup.icon === 'crown_yearly' ? (
+                          <Crown className="w-3.5 h-3.5 text-purple-400" />
+                        ) : (
+                          <Clock className="w-3.5 h-3.5 text-blue-400" />
+                        )}
+                        <span>{categoryGroup.name}</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono px-2 py-0.5 bg-slate-950 rounded-lg border border-slate-800">
+                        {categoryGroup.seats.length} Desks
+                      </span>
                     </div>
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                      {library.seats.map((seat: any) => {
-                        const isBooked = seat.status === 'BOOKED' || seat.status === 'CHECKED_IN';
-                        const isAvailable = seat.status === 'AVAILABLE' || (!isBooked && seat.isAvailable !== false);
+
+                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                      {categoryGroup.seats.map((seat: any) => {
+                        const isCheckedIn = seat.status === 'CHECKED_IN';
+                        const isBooked = seat.status === 'BOOKED';
+                        const isLocked = seat.status === 'LOCKED';
+                        const isMaint = seat.status === 'MAINTENANCE' || seat.isAvailable === false;
+
+                        let seatBg = 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300';
+                        let statusText = 'ACTIVE';
+
+                        if (isMaint) {
+                          seatBg = 'bg-rose-950/40 border-rose-500/40 text-rose-300';
+                          statusText = 'MAINT.';
+                        } else if (isCheckedIn) {
+                          seatBg = 'bg-purple-950/60 border-purple-500/60 text-purple-300 ring-1 ring-purple-500/40';
+                          statusText = seat.activeStudentName ? seat.activeStudentName.split(' ')[0] : 'IN';
+                        } else if (isBooked) {
+                          seatBg = 'bg-blue-950/60 border-blue-500/60 text-blue-300';
+                          statusText = seat.activeStudentName ? seat.activeStudentName.split(' ')[0] : 'BOOKED';
+                        } else if (isLocked) {
+                          seatBg = 'bg-amber-950/60 border-amber-500/60 text-amber-300';
+                          statusText = 'HOLD';
+                        }
+
                         return (
                           <button
                             key={seat.id}
                             type="button"
                             onClick={() => handleToggleSeat(seat.id)}
-                            className={`p-2 rounded-xl border text-center transition active:scale-95 cursor-pointer ${
-                              isBooked
-                                ? 'bg-blue-950/40 border-blue-500/50 text-blue-300'
-                                : isAvailable
-                                ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
-                                : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
-                            }`}
+                            className={`p-2 rounded-xl border text-center transition active:scale-95 cursor-pointer relative ${seatBg}`}
+                            title={`Desk ${seat.seatNumber} (${categoryGroup.tag}) - Click to toggle maintenance`}
                           >
-                            <div className="font-mono font-bold text-xs">{seat.seatNumber}</div>
-                            <div className="text-[9px] mt-0.5 opacity-80 uppercase">
-                              {seat.status || (seat.isAvailable !== false ? 'AVAILABLE' : 'MAINT.')}
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono font-bold text-xs">{seat.seatNumber}</span>
+                              <span className="text-[8px] font-extrabold px-1 rounded bg-black/40 opacity-80">
+                                {categoryGroup.tag === 'YEARLY VIP' ? 'VIP' : categoryGroup.tag === 'MONTHLY PASS' ? 'PASS' : 'HR'}
+                              </span>
+                            </div>
+                            <div className="text-[8.5px] mt-1 font-bold truncate opacity-90 uppercase">
+                              {statusText}
                             </div>
                           </button>
                         );
                       })}
                     </div>
                   </div>
-                ) : (
-                  <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-white text-xs">Desks Layout</span>
-                      <span className="text-[10px] text-slate-400 font-mono">{library.totalSeats || 20} Desks</span>
-                    </div>
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                      {Array.from({ length: library.totalSeats || 20 }).map((_, idx) => (
-                        <div
-                          key={idx}
-                          className="p-2 rounded-xl border text-center bg-emerald-950/40 border-emerald-500/50 text-emerald-300"
-                        >
-                          <div className="font-mono font-bold text-xs">S-{String(idx + 1).padStart(2, '0')}</div>
-                          <div className="text-[9px] mt-0.5 opacity-80">AVAILABLE</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
             )}
 

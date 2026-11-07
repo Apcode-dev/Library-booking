@@ -89,10 +89,11 @@ export class ManagerController {
         return;
       }
 
-      const todayDateStr = new Date().toLocaleDateString('en-CA');
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth(); // 0-indexed
-      const currentMonthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+      const todayDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+      const [currentYearStr, currentMonthStr] = todayDateStr.split('-');
+      const currentYear = parseInt(currentYearStr, 10);
+      const currentMonth = parseInt(currentMonthStr, 10) - 1; // 0-indexed
+      const currentMonthKey = `${currentYearStr}-${currentMonthStr}`;
 
       const todayCheckIns = await prisma.attendance.count({
         where: {
@@ -104,7 +105,7 @@ export class ManagerController {
       const activeBookings = await prisma.booking.count({
         where: {
           libraryId: library.id,
-          status: { in: ['CONFIRMED', 'ACTIVE'] },
+          status: { in: ['CONFIRMED', 'ACTIVE', 'CHECKED_IN'] },
         },
       });
 
@@ -131,8 +132,8 @@ export class ManagerController {
 
       allBookings.forEach((b) => {
         const amount = b.payment?.amount || b.totalAmount || 0;
-        const bDateStr = b.date || b.createdAt.toISOString().split('T')[0];
-        const bMonthKey = bDateStr.slice(0, 7); // "YYYY-MM"
+        const bDateStr = b.date || (b.createdAt ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(b.createdAt)) : '');
+        const bMonthKey = bDateStr ? bDateStr.slice(0, 7) : currentMonthKey;
 
         if (bDateStr === todayDateStr) {
           todayRevenue += amount;
@@ -165,12 +166,17 @@ export class ManagerController {
 
       const totalSeats = library.seats.length || library.totalSeats || 0;
       const activeRightNow = allBookings.filter((b) => {
-        const start = new Date(b.startDateTime);
-        const end = new Date(b.endDateTime);
-        return start <= now && end >= now;
+        if (b.status === 'CHECKED_IN') return true;
+        if (b.status === 'ACTIVE') {
+          if (!b.startDateTime || !b.endDateTime) return true;
+          const start = new Date(b.startDateTime);
+          const end = new Date(b.endDateTime);
+          return start <= now && end >= now;
+        }
+        return false;
       }).length;
 
-      const liveOccupiedSeats = activeRightNow > 0 ? activeRightNow : activeBookings;
+      const liveOccupiedSeats = activeRightNow > 0 ? activeRightNow : (activeBookings > 0 ? activeBookings : 0);
       const occupancyRate = totalSeats > 0 ? Math.min(100, Math.round((liveOccupiedSeats / totalSeats) * 100)) : 0;
 
       const formatSeat = (seat: any) => {
@@ -352,7 +358,7 @@ export class ManagerController {
       }
 
       const libraryId = manager.assignedLibraryId;
-      const todayDateStr = new Date().toLocaleDateString('en-CA');
+      const todayDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
       // 1. Fetch past bookings prior to today for this library
       const pastBookings = await prisma.booking.findMany({
@@ -371,72 +377,105 @@ export class ManagerController {
       // Group past bookings by date
       const dateMap = new Map<string, typeof pastBookings>();
       for (const b of pastBookings) {
-        const bDate = b.date || b.createdAt.toISOString().split('T')[0];
+        const bDate = b.date || (b.createdAt ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(b.createdAt)) : '');
+        if (!bDate || bDate >= todayDateStr) continue;
         if (!dateMap.has(bDate)) {
           dateMap.set(bDate, []);
         }
         dateMap.get(bDate)!.push(b);
       }
 
-      // 2. Auto-archive: Upsert each past day into ArchivedDailyBooking table
-      for (const [dateStr, dayBookings] of dateMap.entries()) {
-        const dayRevenue = dayBookings.reduce(
-          (sum, b) => sum + (b.payment?.amount || b.totalAmount || 0),
-          0
-        );
+      // 2. Auto-archive: Upsert each past day into ArchivedDailyBooking table safely
+      try {
+        for (const [dateStr, dayBookings] of dateMap.entries()) {
+          const dayRevenue = dayBookings.reduce(
+            (sum, b) => sum + (b.payment?.amount || b.totalAmount || 0),
+            0
+          );
 
-        await prisma.archivedDailyBooking.upsert({
-          where: {
-            libraryId_date: {
+          await prisma.archivedDailyBooking.upsert({
+            where: {
+              libraryId_date: {
+                libraryId,
+                date: dateStr,
+              },
+            },
+            update: {
+              totalBookings: dayBookings.length,
+              totalRevenue: dayRevenue,
+              bookingsData: JSON.stringify(dayBookings),
+            },
+            create: {
               libraryId,
               date: dateStr,
+              totalBookings: dayBookings.length,
+              totalRevenue: dayRevenue,
+              bookingsData: JSON.stringify(dayBookings),
             },
-          },
-          update: {
-            totalBookings: dayBookings.length,
-            totalRevenue: dayRevenue,
-            bookingsData: JSON.stringify(dayBookings),
-          },
-          create: {
-            libraryId,
-            date: dateStr,
-            totalBookings: dayBookings.length,
-            totalRevenue: dayRevenue,
-            bookingsData: JSON.stringify(dayBookings),
-          },
-        });
+          });
+        }
+      } catch (upsertErr) {
+        console.warn('Auto-archival upsert warning:', upsertErr);
       }
 
       // 3. Query all archived daily records from database table
-      const archivedRecords = await prisma.archivedDailyBooking.findMany({
+      let archivedRecords = await prisma.archivedDailyBooking.findMany({
         where: { libraryId },
         orderBy: { date: 'desc' },
       });
 
-      const days = archivedRecords.map((rec) => {
-        let bookings: any[] = [];
-        try {
-          bookings = JSON.parse(rec.bookingsData);
-        } catch (_) {}
+      let days: any[] = [];
+      if (archivedRecords.length > 0) {
+        days = archivedRecords.map((rec) => {
+          let bookings: any[] = [];
+          try {
+            bookings = JSON.parse(rec.bookingsData);
+          } catch (_) {}
 
-        const parsedDate = new Date(rec.date);
-        const formattedDate = !isNaN(parsedDate.getTime())
-          ? parsedDate.toLocaleDateString('en-GB', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })
-          : rec.date;
+          const parsedDate = new Date(rec.date);
+          const formattedDate = !isNaN(parsedDate.getTime())
+            ? parsedDate.toLocaleDateString('en-GB', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })
+            : rec.date;
 
-        return {
-          id: rec.id,
-          date: rec.date,
-          formattedDate,
-          totalBookings: rec.totalBookings,
-          totalRevenue: rec.totalRevenue,
-          bookings,
-        };
-      });
+          return {
+            id: rec.id,
+            date: rec.date,
+            formattedDate,
+            totalBookings: rec.totalBookings,
+            totalRevenue: rec.totalRevenue,
+            bookings,
+          };
+        });
+      } else {
+        // Fallback directly to dateMap if database records are empty
+        days = Array.from(dateMap.entries()).map(([dateStr, dayBookings]) => {
+          const dayRevenue = dayBookings.reduce(
+            (sum, b) => sum + (b.payment?.amount || b.totalAmount || 0),
+            0
+          );
+          const parsedDate = new Date(dateStr);
+          const formattedDate = !isNaN(parsedDate.getTime())
+            ? parsedDate.toLocaleDateString('en-GB', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })
+            : dateStr;
+
+          return {
+            id: `arch-${dateStr}`,
+            date: dateStr,
+            formattedDate,
+            totalBookings: dayBookings.length,
+            totalRevenue: dayRevenue,
+            bookings: dayBookings,
+          };
+        }).sort((a, b) => b.date.localeCompare(a.date));
+      }
 
       res.json({
         success: true,
