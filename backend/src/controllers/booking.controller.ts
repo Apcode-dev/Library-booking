@@ -758,4 +758,63 @@ export class BookingController {
       res.status(500).json({ success: false, message: 'Failed to fetch pass attendance', error: error.message });
     }
   }
+
+  /**
+   * Delete attendance punch for logged-in student (Swipe-to-Delete)
+   */
+  static async deleteMyAttendance(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+
+      const record = await prisma.attendance.findFirst({
+        where: { id, userId },
+      });
+
+      if (!record) {
+        res.status(404).json({ success: false, message: 'Attendance record not found or unauthorized' });
+        return;
+      }
+
+      await prisma.attendance.delete({
+        where: { id },
+      });
+
+      res.json({ success: true, message: 'Attendance record removed successfully' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to delete attendance record', error: error.message });
+    }
+  }
+
+  /**
+   * Delete historical booking for logged-in student (Swipe-to-Delete)
+   */
+  static async deleteMyBookingHistory(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+
+      const booking = await prisma.booking.findFirst({
+        where: { id, userId },
+      });
+
+      if (!booking) {
+        res.status(404).json({ success: false, message: 'Booking not found or unauthorized' });
+        return;
+      }
+
+      if (['CONFIRMED', 'CHECKED_IN'].includes(booking.status)) {
+        res.status(400).json({ success: false, message: 'Cannot delete an active or checked-in study pass' });
+        return;
+      }
+
+      await prisma.booking.delete({
+        where: { id },
+      });
+
+      res.json({ success: true, message: 'Booking history item deleted successfully' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to delete booking history', error: error.message });
+    }
+  }
 }

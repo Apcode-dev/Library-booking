@@ -117,6 +117,8 @@ export class ManagerController {
         },
         include: {
           payment: true,
+          user: { select: { id: true, name: true, email: true, phone: true } },
+          seat: { select: { id: true, seatNumber: true, seatType: true } },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -167,11 +169,14 @@ export class ManagerController {
       const totalSeats = library.seats.length || library.totalSeats || 0;
       const activeRightNow = allBookings.filter((b) => {
         if (b.status === 'CHECKED_IN') return true;
-        if (b.status === 'ACTIVE') {
-          if (!b.startDateTime || !b.endDateTime) return true;
-          const start = new Date(b.startDateTime);
-          const end = new Date(b.endDateTime);
-          return start <= now && end >= now;
+        if (b.status === 'ACTIVE' || b.status === 'CONFIRMED') {
+          if (b.date === todayDateStr) return true;
+          if (b.validUntil && new Date(b.validUntil) >= now) return true;
+          if (b.startDateTime && b.endDateTime) {
+            const start = new Date(b.startDateTime);
+            const end = new Date(b.endDateTime);
+            return start <= now && end >= now;
+          }
         }
         return false;
       }).length;
@@ -235,6 +240,7 @@ export class ManagerController {
         },
         todayCheckIns,
         activeBookings,
+        allBookings,
         metrics: {
           todayRevenue: Math.round(todayRevenue * 100) / 100,
           currentMonthRevenue: Math.round(currentMonthRevenue * 100) / 100,
@@ -305,16 +311,16 @@ export class ManagerController {
       }
 
       const scope = (req.query.scope as string) || 'daily';
-      const todayDateStr = new Date().toLocaleDateString('en-CA');
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
+      const todayDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+      const startOfDay = new Date(todayDateStr + 'T00:00:00.000Z');
 
       const whereClause: any = { libraryId: manager.assignedLibraryId };
       if (scope !== 'all') {
-        // Daily bookings only
+        // Daily bookings only (today date, created today in IST, or active/checked-in)
         whereClause.OR = [
           { date: todayDateStr },
           { createdAt: { gte: startOfDay } },
+          { status: { in: ['CHECKED_IN', 'ACTIVE'] } },
         ];
       }
 

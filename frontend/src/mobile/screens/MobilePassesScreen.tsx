@@ -15,7 +15,100 @@ import {
   PlusCircle,
   HelpCircle,
   Armchair,
+  Trash2,
 } from 'lucide-react';
+
+interface SwipeableItemProps {
+  id: string;
+  onDelete: (id: string) => void;
+  children: React.ReactNode;
+}
+
+const SwipeableItem: React.FC<SwipeableItemProps> = ({ id, onDelete, children }) => {
+  const [translateX, setTranslateX] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
+  const startXRef = React.useRef(0);
+  const startYRef = React.useRef(0);
+  const isHorizontalRef = React.useRef<boolean | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    startXRef.current = e.touches[0].clientX;
+    startYRef.current = e.touches[0].clientY;
+    isHorizontalRef.current = null;
+    setIsSwiping(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const diffX = currentX - startXRef.current;
+    const diffY = currentY - startYRef.current;
+
+    if (isHorizontalRef.current === null) {
+      if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
+        isHorizontalRef.current = Math.abs(diffX) > Math.abs(diffY);
+      }
+    }
+
+    if (isHorizontalRef.current) {
+      const clamped = Math.max(-160, Math.min(160, diffX));
+      setTranslateX(clamped);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsSwiping(false);
+    if (Math.abs(translateX) > 80) {
+      setIsDeleted(true);
+      const exitTarget = translateX > 0 ? 380 : -380;
+      setTranslateX(exitTarget);
+      setTimeout(() => {
+        onDelete(id);
+      }, 220);
+    } else {
+      setTranslateX(0);
+    }
+    isHorizontalRef.current = null;
+  };
+
+  if (isDeleted) {
+    return null;
+  }
+
+  const isLeftSwipe = translateX < -20;
+  const isRightSwipe = translateX > 20;
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl my-1.5 select-none touch-pan-y">
+      {/* Background red delete container revealing on swipe left or right */}
+      <div className="absolute inset-0 bg-gradient-to-r from-rose-600 via-rose-700 to-rose-600 rounded-2xl flex items-center justify-between px-4 text-white font-bold text-xs">
+        <div className={`flex items-center gap-1.5 transition-opacity duration-150 ${isRightSwipe ? 'opacity-100 scale-105' : 'opacity-40'}`}>
+          <Trash2 className="w-4 h-4 text-white" />
+          <span>Swipe to Clear</span>
+        </div>
+        <div className={`flex items-center gap-1.5 transition-opacity duration-150 ${isLeftSwipe ? 'opacity-100 scale-105' : 'opacity-40'}`}>
+          <span>Swipe to Clear</span>
+          <Trash2 className="w-4 h-4 text-white" />
+        </div>
+      </div>
+
+      {/* Draggable Card Layer */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          transform: `translateX(${translateX}px)`,
+          transition: isSwiping ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0.9, 0.2, 1)',
+        }}
+        className="relative z-10 will-change-transform"
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
 
 interface MobilePassesScreenProps {
   onOpenAuth: () => void;
@@ -87,6 +180,40 @@ export const MobilePassesScreen: React.FC<MobilePassesScreenProps> = ({
   const pastBookings = bookings.filter(
     (b) => b.status === 'COMPLETED' || b.status === 'CANCELLED' || b.status === 'EXPIRED_NOSHOW'
   );
+
+  const handleDeleteAttendance = async (attendanceId: string) => {
+    const previous = [...attendanceLogs];
+    setAttendanceLogs((prev) => prev.filter((a) => a.id !== attendanceId));
+    try {
+      const res = await api.delete(`/bookings/my-attendance/${attendanceId}`);
+      if (res.data?.success) {
+        toast.success('Attendance record deleted! 🗑️');
+      } else {
+        setAttendanceLogs(previous);
+        toast.error(res.data?.message || 'Failed to delete attendance');
+      }
+    } catch (err: any) {
+      setAttendanceLogs(previous);
+      toast.error(err.response?.data?.message || 'Failed to delete attendance record.');
+    }
+  };
+
+  const handleDeleteHistory = async (bookingId: string) => {
+    const previous = [...bookings];
+    setBookings((prev) => prev.filter((b) => b.id !== bookingId));
+    try {
+      const res = await api.delete(`/bookings/my-history/${bookingId}`);
+      if (res.data?.success) {
+        toast.success('Past session removed from history! 🗑️');
+      } else {
+        setBookings(previous);
+        toast.error(res.data?.message || 'Failed to remove session history');
+      }
+    } catch (err: any) {
+      setBookings(previous);
+      toast.error(err.response?.data?.message || 'Failed to delete session history.');
+    }
+  };
 
   return (
     <div className="space-y-4 pb-24 px-4 pt-3">
@@ -238,6 +365,11 @@ export const MobilePassesScreen: React.FC<MobilePassesScreenProps> = ({
             </p>
           </div>
 
+          <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+            <span>👈 Swipe left or right to clear 👉</span>
+            <span className="text-slate-500 font-mono">{attendanceLogs.length} Records</span>
+          </div>
+
           {attendanceLogs.length === 0 ? (
             <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-3xl space-y-2">
               <Calendar className="w-10 h-10 text-slate-600 mx-auto" />
@@ -248,27 +380,39 @@ export const MobilePassesScreen: React.FC<MobilePassesScreenProps> = ({
             </div>
           ) : (
             attendanceLogs.map((att) => (
-              <div
-                key={att.id}
-                className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between text-xs"
-              >
-                <div>
-                  <div className="font-bold text-white">{att.library?.name || 'Library'}</div>
-                  <div className="text-[10px] text-slate-400">
-                    Desk {att.seatNumber || 'Standard'} • {att.passType} Pass
+              <SwipeableItem key={att.id} id={att.id} onDelete={handleDeleteAttendance}>
+                <div className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
+                  <div>
+                    <div className="font-bold text-white">{att.library?.name || 'Library'}</div>
+                    <div className="text-[10px] text-slate-400">
+                      Desk {att.seatNumber || 'Standard'} • {att.passType} Pass
+                    </div>
                   </div>
-                </div>
 
-                <div className="text-right">
-                  <div className="text-emerald-400 font-bold">{att.date}</div>
-                  <div className="text-[10px] text-slate-500">
-                    {new Date(att.checkInTime).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                  <div className="flex items-center gap-2.5">
+                    <div className="text-right">
+                      <div className="text-emerald-400 font-bold">{att.date}</div>
+                      <div className="text-[10px] text-slate-500">
+                        {new Date(att.checkInTime).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteAttendance(att.id);
+                      }}
+                      className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                      title="Delete record"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-              </div>
+              </SwipeableItem>
             ))
           )}
         </div>
@@ -277,6 +421,11 @@ export const MobilePassesScreen: React.FC<MobilePassesScreenProps> = ({
       {/* Tab 3: History */}
       {activeTab === 'history' && (
         <div className="space-y-3">
+          <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+            <span>👈 Swipe left or right to clear 👉</span>
+            <span className="text-slate-500 font-mono">{pastBookings.length} Sessions</span>
+          </div>
+
           {pastBookings.length === 0 ? (
             <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-3xl space-y-2">
               <Clock className="w-10 h-10 text-slate-600 mx-auto" />
@@ -285,38 +434,50 @@ export const MobilePassesScreen: React.FC<MobilePassesScreenProps> = ({
             </div>
           ) : (
             pastBookings.map((b) => (
-              <div
-                key={b.id}
-                className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2 text-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">{b.library?.name}</span>
-                  <span
-                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
-                      b.status === 'COMPLETED'
-                        ? 'bg-blue-950 text-blue-300'
-                        : b.status === 'EXPIRED_NOSHOW'
-                        ? 'bg-amber-950 text-amber-300'
-                        : 'bg-rose-950 text-rose-300'
-                    }`}
-                  >
-                    {b.status}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-slate-400 text-[11px]">
-                  <span>
-                    {b.date} • Desk {b.seat?.seatNumber}
-                  </span>
-                  <span>Paid: ₹{b.totalAmount}</span>
-                </div>
-
-                {b.refundAmount > 0 && (
-                  <div className="p-2 rounded-xl bg-emerald-950/40 border border-emerald-900/50 text-emerald-300 text-[10px]">
-                    Refund of ₹{b.refundAmount} was processed ({b.refundStatus}).
+              <SwipeableItem key={b.id} id={b.id} onDelete={handleDeleteHistory}>
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white">{b.library?.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                          b.status === 'COMPLETED'
+                            ? 'bg-blue-950 text-blue-300'
+                            : b.status === 'EXPIRED_NOSHOW'
+                            ? 'bg-amber-950 text-amber-300'
+                            : 'bg-rose-950 text-rose-300'
+                        }`}
+                      >
+                        {b.status}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteHistory(b.id);
+                        }}
+                        className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                        title="Delete past session"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                    <span>
+                      {b.date} • Desk {b.seat?.seatNumber}
+                    </span>
+                    <span>Paid: ₹{b.totalAmount}</span>
+                  </div>
+
+                  {b.refundAmount > 0 && (
+                    <div className="p-2 rounded-xl bg-emerald-950/40 border border-emerald-900/50 text-emerald-300 text-[10px]">
+                      Refund of ₹{b.refundAmount} was processed ({b.refundStatus}).
+                    </div>
+                  )}
+                </div>
+              </SwipeableItem>
             ))
           )}
         </div>

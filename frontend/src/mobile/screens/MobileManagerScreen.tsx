@@ -85,6 +85,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
 
   // Bookings Tab state (Strictly today's daily bookings)
   const [bookings, setBookings] = useState<any[]>([]);
+  const [allBookingsList, setAllBookingsList] = useState<any[]>([]);
   const [bookingSearch, setBookingSearch] = useState('');
   const [bookingFilterType, setBookingFilterType] = useState('ALL');
 
@@ -113,6 +114,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
         setTodayCheckIns(dashRes.data.todayCheckIns || 0);
         setActiveBookingsCount(dashRes.data.activeBookings || 0);
         setDashboardMetrics(dashRes.data.metrics || null);
+        setAllBookingsList(dashRes.data.allBookings || []);
       } else if (dashRes.data.message) {
         toast.error(dashRes.data.message);
       }
@@ -268,6 +270,55 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
       );
     });
   }, [usersList, userSearch]);
+
+  // Dedicated Branch Metrics for Manager's Console (Matching Owner Console Dynamic Metrics)
+  const branchMetrics = useMemo(() => {
+    if (!library) return dashboardMetrics || null;
+    const branchBookings = (allBookingsList && allBookingsList.length > 0) ? allBookingsList : bookings;
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const now = new Date();
+    const currentMonthKey = todayStr.slice(0, 7);
+
+    let currentMonthRevenue = 0;
+    let todayRevenue = 0;
+    let activeNow = 0;
+
+    branchBookings.forEach((b: any) => {
+      const amount = b.payment?.amount || b.totalAmount || 0;
+      const bDateStr = b.date || (b.createdAt ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(b.createdAt)) : '');
+      const bMonthKey = bDateStr ? bDateStr.slice(0, 7) : currentMonthKey;
+
+      if (bDateStr === todayStr) {
+        todayRevenue += amount;
+      }
+      if (bMonthKey === currentMonthKey) {
+        currentMonthRevenue += amount;
+      }
+
+      if (b.status === 'CHECKED_IN' || b.status === 'CONFIRMED' || b.status === 'ACTIVE') {
+        const start = b.startDateTime ? new Date(b.startDateTime) : null;
+        const end = b.endDateTime ? new Date(b.endDateTime) : null;
+        if (start && end && start <= now && end >= now) {
+          activeNow += 1;
+        } else if (b.status === 'CHECKED_IN' || b.date === todayStr) {
+          activeNow += 1;
+        }
+      }
+    });
+
+    const totalSeats = library.seats?.length || library.totalSeats || 0;
+    const occupiedSeats = activeNow > 0 ? activeNow : (dashboardMetrics?.occupiedSeats ?? activeBookingsCount ?? 0);
+    const occupancyRate = totalSeats > 0 ? Math.min(100, Math.round((occupiedSeats / totalSeats) * 100)) : 0;
+
+    return {
+      currentMonthRevenue: currentMonthRevenue > 0 ? currentMonthRevenue : (dashboardMetrics?.currentMonthRevenue || 0),
+      todayRevenue: todayRevenue > 0 ? todayRevenue : (dashboardMetrics?.todayRevenue || 0),
+      activeNow: occupiedSeats,
+      occupancyRate: occupancyRate > 0 ? occupancyRate : (dashboardMetrics?.occupancyRate || 0),
+      totalSeats,
+      currentMonthName: dashboardMetrics?.currentMonthName,
+    };
+  }, [library, allBookingsList, bookings, dashboardMetrics, activeBookingsCount]);
 
   // Categorized seats (Divided into Hourly Study Desks, Monthly Pass Desks, and Yearly VIP Desks like Owner side)
   const seatCategories = useMemo(() => {
@@ -512,15 +563,15 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
                     <span className="text-[9px] text-slate-400 uppercase font-bold">Net Earnings</span>
                     <div className="text-lg font-black text-emerald-400">
-                      ₹{(dashboardMetrics?.currentMonthRevenue || 0).toLocaleString('en-IN')}
+                      ₹{(branchMetrics?.currentMonthRevenue ?? dashboardMetrics?.currentMonthRevenue ?? 0).toLocaleString('en-IN')}
                     </div>
-                    <span className="text-[9px] text-slate-500">This branch ({dashboardMetrics?.currentMonthName || 'Month'})</span>
+                    <span className="text-[9px] text-slate-500">This branch ({branchMetrics?.currentMonthName || dashboardMetrics?.currentMonthName || 'Month'})</span>
                   </div>
 
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
                     <span className="text-[9px] text-slate-400 uppercase font-bold">Today's Payout</span>
                     <div className="text-lg font-black text-white">
-                      ₹{(dashboardMetrics?.todayRevenue || 0).toLocaleString('en-IN')}
+                      ₹{(branchMetrics?.todayRevenue ?? dashboardMetrics?.todayRevenue ?? 0).toLocaleString('en-IN')}
                     </div>
                     <span className="text-[9px] text-slate-500">Live Collection</span>
                   </div>
@@ -528,10 +579,10 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
                     <span className="text-[9px] text-slate-400 uppercase font-bold">Live Occupancy</span>
                     <div className="text-lg font-black text-blue-400">
-                      {dashboardMetrics?.occupancyRate || 0}%
+                      {branchMetrics?.occupancyRate ?? dashboardMetrics?.occupancyRate ?? 0}%
                     </div>
                     <span className="text-[9px] text-slate-500">
-                      {dashboardMetrics?.occupiedSeats ?? activeBookingsCount} / {library.seats?.length || library.totalSeats || 0} occupied
+                      {branchMetrics?.activeNow ?? dashboardMetrics?.occupiedSeats ?? activeBookingsCount} / {library.seats?.length || library.totalSeats || 0} occupied
                     </span>
                   </div>
 

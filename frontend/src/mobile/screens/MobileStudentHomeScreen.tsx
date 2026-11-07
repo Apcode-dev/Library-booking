@@ -39,6 +39,7 @@ export const MobileStudentHomeScreen: React.FC<MobileStudentHomeScreenProps> = (
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<'ALL' | 'HOURLY' | 'PASSES'>('ALL');
   const [isGpsActive, setIsGpsActive] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<string[]>(() => getFavoriteIds(user?.id));
 
@@ -96,22 +97,56 @@ export const MobileStudentHomeScreen: React.FC<MobileStudentHomeScreenProps> = (
   }, [search, activeCategory]);
 
   const handleUseGps = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your device.');
+    if (isGpsActive) {
+      setIsGpsActive(false);
+      setUserCoords(null);
+      fetchLibraries(undefined);
+      toast.info('GPS filter turned off');
       return;
     }
 
-    setIsGpsActive(true);
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your device.');
+      return;
+    }
+
+    setIsLocating(true);
+    toast.info('Detecting your location... 📍');
+
+    const onSuccess = (pos: GeolocationPosition) => {
+      const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setUserCoords(coords);
+      setIsGpsActive(true);
+      setIsLocating(false);
+      fetchLibraries(coords);
+      toast.success('Nearby libraries sorted by distance! 📍');
+    };
+
+    const onError = () => {
+      // If high accuracy failed (e.g. indoors or timeout), retry with network location (low accuracy)
+      navigator.geolocation.getCurrentPosition(
+        onSuccess,
+        (fallbackErr) => {
+          setIsLocating(false);
+          setIsGpsActive(false);
+          let msg = 'Could not access GPS. Please check location permissions and GPS toggle.';
+          if (fallbackErr.code === fallbackErr.PERMISSION_DENIED) {
+            msg = 'Location permission was denied. Please allow location in App Settings.';
+          } else if (fallbackErr.code === fallbackErr.POSITION_UNAVAILABLE) {
+            msg = 'Location unavailable. Please make sure device GPS is turned ON.';
+          } else if (fallbackErr.code === fallbackErr.TIMEOUT) {
+            msg = 'Location request timed out. Please try again.';
+          }
+          toast.error(msg);
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      );
+    };
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setUserCoords(coords);
-        fetchLibraries(coords);
-      },
-      () => {
-        setIsGpsActive(false);
-        alert('Could not retrieve current GPS location. Please ensure location is enabled.');
-      }
+      onSuccess,
+      onError,
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 }
     );
   };
 
@@ -143,14 +178,15 @@ export const MobileStudentHomeScreen: React.FC<MobileStudentHomeScreenProps> = (
           <button
             type="button"
             onClick={handleUseGps}
+            disabled={isLocating}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition ${
               isGpsActive && userCoords
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'bg-slate-900 text-slate-300 border border-slate-800 hover:border-slate-700'
-            }`}
+            } ${isLocating ? 'opacity-70 animate-pulse' : ''}`}
           >
-            <Navigation className={`w-3.5 h-3.5 ${isGpsActive ? 'text-white' : 'text-blue-400'}`} />
-            <span>{isGpsActive && userCoords ? 'Near Me (GPS)' : 'Near Me'}</span>
+            <Navigation className={`w-3.5 h-3.5 ${isGpsActive ? 'text-white' : 'text-blue-400'} ${isLocating ? 'animate-spin' : ''}`} />
+            <span>{isLocating ? 'Locating...' : isGpsActive && userCoords ? 'Near Me (GPS Active)' : 'Near Me'}</span>
           </button>
 
           <button

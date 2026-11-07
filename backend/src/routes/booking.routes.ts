@@ -19,6 +19,8 @@ router.post('/confirm', BookingController.confirmBooking);
 // User bookings history, passes & attendance
 router.get('/my-bookings', BookingController.getUserBookings);
 router.get('/my-attendance', BookingController.getMyAttendance);
+router.delete('/my-attendance/:id', BookingController.deleteMyAttendance);
+router.delete('/my-history/:id', BookingController.deleteMyBookingHistory);
 router.get('/:id/attendance', BookingController.getBookingAttendance);
 router.get('/:id', BookingController.getBookingById);
 router.post('/:id/cancel', BookingController.cancelBooking);
