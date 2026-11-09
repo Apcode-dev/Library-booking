@@ -203,6 +203,9 @@ model Booking {
   validUntil    DateTime? // Validity expiry date for Monthly & Yearly passes
   qrCode             String?   // QR Code Data URL or payload
   checkInTime        DateTime?
+  checkOutTime       DateTime?
+  checkOutType       String?   // "REALTIME" | "MANUAL"
+  isCurrentlyInside  Boolean   @default(false)
   reminder30Sent     Boolean   @default(false)
   reminder90Sent     Boolean   @default(false)
   refundAmount       Float?    @default(0)
@@ -264,6 +267,10 @@ model Attendance {
   library     Library  @relation(fields: [libraryId], references: [id], onDelete: Cascade)
   date        String   // "YYYY-MM-DD" local/IST date
   checkInTime DateTime @default(now())
+  checkOutTime    DateTime?
+  checkOutType    String?   @default("REALTIME") // "REALTIME" | "MANUAL"
+  durationMinutes Int?      // Study duration in minutes
+  manualExitNotes String?   // Remarks if entered manually
   passType    String   @default("MONTHLY") // "MONTHLY" | "YEARLY" | "HOURLY" | "DAILY"
   seatNumber  String?
   createdAt   DateTime @default(now())

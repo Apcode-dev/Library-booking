@@ -64,6 +64,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
   const [library, setLibrary] = useState<any>(null);
   const [managerInfo, setManagerInfo] = useState<any>(null);
   const [todayCheckIns, setTodayCheckIns] = useState(0);
+  const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
   const [activeBookingsCount, setActiveBookingsCount] = useState(0);
   const [dashboardMetrics, setDashboardMetrics] = useState<any>(null);
   const [isOldRecordsModalOpen, setIsOldRecordsModalOpen] = useState(false);
@@ -112,6 +113,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
         setLibrary(dashRes.data.library);
         setManagerInfo(dashRes.data.manager);
         setTodayCheckIns(dashRes.data.todayCheckIns || 0);
+        setRecentAttendance(dashRes.data.recentAttendance || []);
         setActiveBookingsCount(dashRes.data.activeBookings || 0);
         setDashboardMetrics(dashRes.data.metrics || null);
         setAllBookingsList(dashRes.data.allBookings || []);
@@ -1128,6 +1130,103 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
           <p>
             • If a student scans a pass from another branch, an instant <strong>"Pass Not Valid ❌"</strong> alert will be triggered.
           </p>
+        </div>
+
+        {/* Gate Attendance Register (Live Punches) */}
+        <div className="space-y-2.5 pt-2">
+          <div className="flex items-center justify-between">
+            <span className="font-extrabold text-white text-xs">Gate Attendance Register</span>
+            <span className="text-[10px] text-emerald-400 font-mono font-bold">
+              {recentAttendance.length} Records
+            </span>
+          </div>
+
+          {recentAttendance.length === 0 ? (
+            <div className="p-6 text-center bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
+              <Calendar className="w-7 h-7 text-slate-600 mx-auto" />
+              <p className="text-white font-bold text-xs">No Punches Recorded Yet</p>
+              <p className="text-[10px] text-slate-400">
+                Punches will appear here in real-time when students scan passes or check out.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recentAttendance.map((log: any) => (
+                <div
+                  key={log.id}
+                  className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2 shadow-sm"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-bold text-white text-xs">
+                        {log.user?.name || 'Student'}
+                      </h4>
+                      <p className="text-[10px] text-slate-400">
+                        Desk {log.seatNumber || log.booking?.seat?.seatNumber || 'Assigned'} • {log.booking?.bookingType || 'Pass'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {log.checkOutType === 'MANUAL' && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold">
+                          Manual Exit
+                        </span>
+                      )}
+                      {!log.checkOutTime ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 text-[9px] font-bold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                          Inside
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-lg bg-slate-950 text-slate-300 border border-slate-800 text-[9px] font-bold">
+                          Exited
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-2 bg-slate-950 rounded-xl border border-slate-800/80 grid grid-cols-3 gap-2 text-[10px]">
+                    <div>
+                      <span className="text-[9px] text-slate-500 block uppercase font-bold">Date</span>
+                      <span className="text-white font-mono">{log.date}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-slate-500 block uppercase font-bold">Check-In</span>
+                      <span className="text-emerald-400 font-mono font-bold">
+                        {new Date(log.checkInTime).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-slate-500 block uppercase font-bold">Check-Out</span>
+                      <span className={`font-mono font-bold ${log.checkOutTime ? 'text-amber-400' : 'text-slate-500'}`}>
+                        {log.checkOutTime
+                          ? new Date(log.checkOutTime).toLocaleTimeString('en-US', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : 'In Hall'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {(log.durationMinutes !== null && log.durationMinutes !== undefined && log.durationMinutes > 0) && (
+                    <div className="text-[10px] text-slate-400 px-0.5">
+                      Total Time: <strong className="text-white">{Math.floor(log.durationMinutes / 60)}h {log.durationMinutes % 60}m</strong>
+                    </div>
+                  )}
+
+                  {log.manualExitNotes && (
+                    <div className="text-[10px] text-slate-400 italic bg-slate-950/70 px-2 py-1 rounded-lg border border-slate-800/60">
+                      📝 {log.manualExitNotes}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Scanner Modal */}

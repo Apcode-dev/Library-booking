@@ -48,6 +48,8 @@ export const MobileLibraryDetailsScreen: React.FC<MobileLibraryDetailsScreenProp
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
   const [startTime, setStartTime] = useState(getNowTimeStr());
   const [durationHours, setDurationHours] = useState(3);
+  const [isCustomDuration, setIsCustomDuration] = useState(false);
+  const [customDurationInput, setCustomDurationInput] = useState('');
 
   // Seat zones & availability
   const [zones, setZones] = useState<SeatZone[]>([]);
@@ -144,7 +146,7 @@ export const MobileLibraryDetailsScreen: React.FC<MobileLibraryDetailsScreenProp
     let lockStartTime = startTime;
     let lockEndTime = endTime;
 
-    if (bookingPlan !== 'HOURLY') {
+    if (bookingPlan === 'YEARLY') {
       const now = new Date();
       const curHH = String(now.getHours()).padStart(2, '0');
       const curMM = String(now.getMinutes()).padStart(2, '0');
@@ -320,7 +322,7 @@ export const MobileLibraryDetailsScreen: React.FC<MobileLibraryDetailsScreenProp
                   value={selectedDate}
                   min={getTodayStr()}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white text-xs"
                 />
               </div>
 
@@ -332,24 +334,32 @@ export const MobileLibraryDetailsScreen: React.FC<MobileLibraryDetailsScreenProp
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white text-xs"
                 />
               </div>
             </div>
 
             {/* Quick Duration Buttons */}
             <div>
-              <span className="text-[10px] font-bold text-slate-400 block mb-1">
-                Study Duration
-              </span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold text-slate-400 block">
+                  Study Duration ({durationHours}h: {startTime} - {endTime})
+                </span>
+                <span className="text-[10px] font-bold text-emerald-400">
+                  ₹{parseFloat((durationHours * library.hourlyRate).toFixed(2))}
+                </span>
+              </div>
               <div className="grid grid-cols-4 gap-1.5">
                 {[1, 2, 3, 4].map((hours) => (
                   <button
                     key={hours}
                     type="button"
-                    onClick={() => setDurationHours(hours)}
+                    onClick={() => {
+                      setIsCustomDuration(false);
+                      setDurationHours(hours);
+                    }}
                     className={`py-1.5 rounded-xl text-xs font-bold transition ${
-                      durationHours === hours
+                      !isCustomDuration && durationHours === hours
                         ? 'bg-blue-600 text-white shadow-sm'
                         : 'bg-slate-950 text-slate-400 border border-slate-800'
                     }`}
@@ -359,6 +369,124 @@ export const MobileLibraryDetailsScreen: React.FC<MobileLibraryDetailsScreenProp
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Monthly Pass Specific Hour-Based Recurring Controls */}
+        {bookingPlan === 'MONTHLY' && (
+          <div className="bg-slate-900 p-3.5 rounded-2xl border border-blue-500/40 space-y-3 shadow-lg shadow-blue-950/20">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-1.5 text-blue-400 font-bold text-xs">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Daily Study Slot (Monthly Pass)</span>
+              </div>
+              <span className="text-[10px] text-amber-300 font-mono bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20 font-bold">
+                30 Days Pass
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Pass Start Date</label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  min={getTodayStr()}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                  Daily Start Time
+                </label>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-white text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Daily Hours Selection: 1h, 2h, 3h, 4h, 6h, 8h, 12h, Custom */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-bold text-slate-300 block">
+                  Select Daily Study Hours
+                </span>
+                <span className="text-[11px] text-emerald-400 font-black">
+                  ₹{Math.max(150, Math.round(((library.monthlyRate || 1200) / 12) * durationHours))}/mo
+                </span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-1.5">
+                {[1, 2, 3, 4, 6, 8, 12].map((hours) => (
+                  <button
+                    key={hours}
+                    type="button"
+                    onClick={() => {
+                      setIsCustomDuration(false);
+                      setDurationHours(hours);
+                    }}
+                    className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                      !isCustomDuration && durationHours === hours
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    {hours} {hours === 1 ? 'Hour' : 'Hours'}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setIsCustomDuration(true)}
+                  className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                    isCustomDuration
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
+                  }`}
+                >
+                  Custom
+                </button>
+              </div>
+
+              {/* Custom Hours Input */}
+              {isCustomDuration && (
+                <div className="mt-2 flex items-center gap-2 animate-fade-in">
+                  <input
+                    type="number"
+                    min="1"
+                    max="24"
+                    placeholder="Enter daily hours (1 to 24)"
+                    value={customDurationInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomDurationInput(val);
+                      const parsed = parseFloat(val);
+                      if (parsed > 0 && parsed <= 24) {
+                        setDurationHours(parsed);
+                      }
+                    }}
+                    className="flex-1 bg-slate-950 border border-blue-500 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                  />
+                  <span className="text-xs text-slate-300 font-bold whitespace-nowrap">Hours / Day</span>
+                </div>
+              )}
+            </div>
+
+            {/* Shift & Time-sharing note */}
+            <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-[10px] text-slate-300 flex items-center justify-between">
+              <span className="text-slate-400">Reserved Daily Slot:</span>
+              <span className="font-bold text-white font-mono bg-blue-500/20 px-2 py-0.5 rounded border border-blue-500/30">
+                {startTime} to {endTime} ({durationHours}h)
+              </span>
+            </div>
+            <p className="text-[9px] text-slate-500 leading-tight">
+              💡 Desks are allocated for your exact daily time slot. Outside these hours, desks can be shared by other members.
+            </p>
           </div>
         )}
 

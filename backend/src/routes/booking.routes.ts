@@ -23,6 +23,7 @@ router.delete('/my-attendance/:id', BookingController.deleteMyAttendance);
 router.delete('/my-history/:id', BookingController.deleteMyBookingHistory);
 router.get('/:id/attendance', BookingController.getBookingAttendance);
 router.get('/:id', BookingController.getBookingById);
+router.post('/:id/checkout', BookingController.checkOutBooking);
 router.post('/:id/cancel', BookingController.cancelBooking);
 router.post('/:id/extend', BookingController.extendBooking);
 router.post('/:id/pay-extension', BookingController.payExtension);

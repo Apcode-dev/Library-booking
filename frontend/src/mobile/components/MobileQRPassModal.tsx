@@ -15,6 +15,7 @@ import {
   CreditCard,
   Sparkles,
   ShieldCheck,
+  LogOut,
 } from 'lucide-react';
 
 interface MobileQRPassModalProps {
@@ -49,6 +50,7 @@ export const MobileQRPassModal: React.FC<MobileQRPassModalProps> = ({
   const [cancelling, setCancelling] = useState(false);
   const [extending, setExtending] = useState(false);
   const [payingExtension, setPayingExtension] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
 
   React.useEffect(() => {
     setBooking(initialBooking);
@@ -57,6 +59,7 @@ export const MobileQRPassModal: React.FC<MobileQRPassModalProps> = ({
   if (!booking) return null;
 
   const isCheckedIn = Boolean(booking.checkInTime);
+  const isCurrentlyInside = booking.isCurrentlyInside || (booking.status === 'CHECKED_IN' && !booking.checkOutTime);
   const isCancelled = booking.status === 'CANCELLED';
   const isCompleted = booking.status === 'COMPLETED' || booking.status === 'EXPIRED_NOSHOW';
   const isActive = booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN';
@@ -65,6 +68,24 @@ export const MobileQRPassModal: React.FC<MobileQRPassModalProps> = ({
     (Number(booking.pendingExtensionHours) > 0 && booking.extensionPaymentStatus !== 'PAID');
   const isExtensionPaid = booking.extensionPaymentStatus === 'PAID';
   const pendingAmount = Number(booking.pendingExtensionAmount || booking.hourlyRate || 20);
+
+  const handleCheckOut = async () => {
+    setCheckingOut(true);
+    try {
+      const res = await api.post(`/bookings/${booking.id}/checkout`, { isManual: false });
+      if (res.data?.success) {
+        toast.success(res.data.message || 'Checked out successfully! 👋');
+        onBookingUpdated?.();
+        onClose();
+      } else {
+        toast.error(res.data?.message || 'Check-out failed');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Error processing check-out.');
+    } finally {
+      setCheckingOut(false);
+    }
+  };
 
   const handleCancel = async () => {
     if (!window.confirm('Are you sure you want to cancel? You will receive an immediate 50% refund.')) {
@@ -304,6 +325,21 @@ export const MobileQRPassModal: React.FC<MobileQRPassModalProps> = ({
               <span className="font-mono text-emerald-400 font-bold text-[10px]">
                 {booking.extensionPaymentId ? `TXN: ${booking.extensionPaymentId.slice(-8)}` : 'COMPLETED'}
               </span>
+            </div>
+          )}
+
+          {/* Check-Out of Study Hall (Realtime 1-tap exit) */}
+          {isCurrentlyInside && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={handleCheckOut}
+                disabled={checkingOut}
+                className="w-full py-3 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white rounded-xl text-xs font-black shadow-lg shadow-rose-950/40 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>{checkingOut ? 'Checking out...' : 'Check Out of Study Hall 👋'}</span>
+              </button>
             </div>
           )}
 

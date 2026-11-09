@@ -102,6 +102,18 @@ export class ManagerController {
         },
       });
 
+      const recentAttendanceLogs = await prisma.attendance.findMany({
+        where: {
+          libraryId: library.id,
+        },
+        include: {
+          user: { select: { id: true, name: true, phone: true } },
+          booking: { select: { bookingCode: true, bookingType: true, seat: { select: { seatNumber: true } } } },
+        },
+        orderBy: { checkInTime: 'desc' },
+        take: 50,
+      });
+
       const activeBookings = await prisma.booking.count({
         where: {
           libraryId: library.id,
@@ -239,6 +251,7 @@ export class ManagerController {
           seats: formattedDirectSeats,
         },
         todayCheckIns,
+        recentAttendance: recentAttendanceLogs,
         activeBookings,
         allBookings,
         metrics: {
@@ -679,7 +692,7 @@ export class ManagerController {
 
       await prisma.booking.update({
         where: { id: booking.id },
-        data: { checkInTime: now, status: 'ACTIVE' },
+        data: { checkInTime: now, status: 'CHECKED_IN', isCurrentlyInside: true },
       });
 
       res.json({

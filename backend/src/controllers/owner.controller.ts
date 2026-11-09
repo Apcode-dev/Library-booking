@@ -799,6 +799,7 @@ export class OwnerController {
         data: {
           status: 'CHECKED_IN',
           checkInTime: now,
+          isCurrentlyInside: true,
         },
       });
 

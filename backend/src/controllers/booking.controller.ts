@@ -4,6 +4,7 @@ import { SeatLockService } from '../services/seat-lock.service';
 import { generateQRCodeDataURL } from '../utils/qr.utils';
 import { EmailService } from '../services/email.service';
 import { ENV } from '../config/env';
+import { createDateTime, calculateDurationHours } from '../utils/time.utils';
 
 export class BookingController {
   /**
@@ -104,18 +105,21 @@ export class BookingController {
           diffMs / (1000 * 60 * 60)
         );
         const hourlyRate = seat.hourlyPrice || library.hourlyRate;
+        const dailyHours = calculateDurationHours(lock.startTime, lock.endTime);
         let seatAmount = 0;
 
         if (bookingType === 'MONTHLY') {
-          durationHours = 30 * 12;
-          seatAmount = library.monthlyRate || Math.round(hourlyRate * 80);
+          durationHours = 30 * dailyHours;
+          const fullMonthRate = library.monthlyRate || Math.round(hourlyRate * 80);
+          seatAmount = Math.max(150, Math.round((fullMonthRate / 12) * dailyHours));
         } else if (bookingType === 'YEARLY') {
-          durationHours = 365 * 12;
-          seatAmount =
+          durationHours = 365 * dailyHours;
+          const fullYearRate =
             library.yearlyRate ||
             (library.monthlyRate ? library.monthlyRate * 10 : Math.round(hourlyRate * 750));
+          seatAmount = Math.max(1500, Math.round((fullYearRate / 12) * dailyHours));
         } else {
-          seatAmount = parseFloat((durationHours * hourlyRate).toFixed(2));
+          seatAmount = parseFloat((dailyHours * hourlyRate).toFixed(2));
         }
 
         const taxPercent = library.taxPercent ?? 0;
@@ -815,6 +819,107 @@ export class BookingController {
       res.json({ success: true, message: 'Booking history item deleted successfully' });
     } catch (error: any) {
       res.status(500).json({ success: false, message: 'Failed to delete booking history', error: error.message });
+    }
+  }
+
+  /**
+   * Student Check-Out (Realtime 1-tap or Manual date/time fallback)
+   */
+  static async checkOutBooking(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { isManual, manualDate, manualTime, notes } = req.body;
+      const userId = req.user!.id;
+
+      const booking = await prisma.booking.findFirst({
+        where: { id, userId },
+        include: {
+          library: { select: { name: true } },
+          seat: { select: { seatNumber: true } },
+        },
+      });
+
+      if (!booking) {
+        res.status(404).json({ success: false, message: 'Study pass not found.' });
+        return;
+      }
+
+      const now = new Date();
+      let checkOutTime: Date;
+      let checkOutType = 'REALTIME';
+      let targetDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+
+      if (isManual) {
+        if (!manualDate || !manualTime) {
+          res.status(400).json({
+            success: false,
+            message: 'Manual checkout requires both date (YYYY-MM-DD) and time (HH:MM).',
+          });
+          return;
+        }
+        checkOutTime = createDateTime(manualDate, manualTime);
+        checkOutType = 'MANUAL';
+        targetDateStr = manualDate;
+      } else {
+        checkOutTime = now;
+        checkOutType = 'REALTIME';
+      }
+
+      // Find or link with the attendance record for this session/date
+      let attendance = await prisma.attendance.findFirst({
+        where: {
+          bookingId: booking.id,
+          date: targetDateStr,
+        },
+        orderBy: { checkInTime: 'desc' },
+      });
+
+      if (!attendance) {
+        attendance = await prisma.attendance.findFirst({
+          where: { bookingId: booking.id },
+          orderBy: { checkInTime: 'desc' },
+        });
+      }
+
+      let durationMinutes: number | null = null;
+      if (attendance && attendance.checkInTime) {
+        const diffMs = checkOutTime.getTime() - new Date(attendance.checkInTime).getTime();
+        durationMinutes = Math.max(0, Math.round(diffMs / (1000 * 60)));
+      }
+
+      if (attendance) {
+        await prisma.attendance.update({
+          where: { id: attendance.id },
+          data: {
+            checkOutTime,
+            checkOutType,
+            durationMinutes,
+            manualExitNotes: notes || (isManual ? `Manual checkout logged at ${manualTime} on ${manualDate}` : null),
+          },
+        });
+      }
+
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          checkOutTime,
+          checkOutType,
+          isCurrentlyInside: false,
+          ...(booking.bookingType === 'HOURLY' ? { status: 'COMPLETED' } : {}),
+        },
+      });
+
+      const formattedExitTime = checkOutTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      res.json({
+        success: true,
+        message: `Checked out successfully! 👋 (${formattedExitTime})`,
+        checkOutTime,
+        checkOutType,
+        durationMinutes,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Checkout failed', error: error.message });
     }
   }
 }

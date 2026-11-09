@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
-import { createDateTime } from '../utils/time.utils';
+import { createDateTime, doBookingsCollide } from '../utils/time.utils';
 
 export class SeatController {
   /**
@@ -49,28 +49,45 @@ export class SeatController {
 
       // Collect all seat IDs
       const allSeatIds = zones.flatMap((z) => z.seats.map((s) => s.id));
+      const bookingType = ((req.query.bookingType as string) || 'HOURLY').toUpperCase();
 
-      // 1. Find overlapping confirmed bookings for this time window
-      // Must not be expired (endDateTime must be > now if startDateTime is in past/present)
-      const effectiveMinEnd = startDateTime > now ? startDateTime : now;
+      const targetBookingQuery = {
+        bookingType,
+        date: date as string,
+        startTime: startTime as string,
+        endTime: endTime as string,
+        validUntil: bookingType === 'MONTHLY'
+          ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          : bookingType === 'YEARLY'
+          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+          : null,
+      };
+
+      // 1. Find overlapping confirmed bookings for this seat & time window
       const activeBookings = await prisma.booking.findMany({
         where: {
           seatId: { in: allSeatIds },
           status: { in: ['CONFIRMED', 'CHECKED_IN'] },
-          startDateTime: { lt: endDateTime },
-          endDateTime: { gt: effectiveMinEnd },
         },
         select: {
+          id: true,
           seatId: true,
           userId: true,
+          date: true,
           startTime: true,
           endTime: true,
+          bookingType: true,
+          validUntil: true,
           bookingCode: true,
         },
       });
 
       const bookedSeatMap = new Map<string, any>();
-      activeBookings.forEach((b) => bookedSeatMap.set(b.seatId, b));
+      activeBookings.forEach((b) => {
+        if (doBookingsCollide(targetBookingQuery, b)) {
+          bookedSeatMap.set(b.seatId, b);
+        }
+      });
 
       // 2. Find overlapping active temporary locks (expiresAt > NOW())
       const activeLocks = await prisma.seatLock.findMany({
@@ -78,19 +95,31 @@ export class SeatController {
           seatId: { in: allSeatIds },
           status: 'ACTIVE',
           expiresAt: { gt: now },
-          startDateTime: { lt: endDateTime },
-          endDateTime: { gt: startDateTime },
         },
         select: {
           seatId: true,
           userId: true,
+          date: true,
+          startTime: true,
+          endTime: true,
           expiresAt: true,
           lockToken: true,
         },
       });
 
       const lockedSeatMap = new Map<string, any>();
-      activeLocks.forEach((l) => lockedSeatMap.set(l.seatId, l));
+      activeLocks.forEach((l) => {
+        if (
+          doBookingsCollide(targetBookingQuery, {
+            bookingType: 'HOURLY',
+            date: l.date,
+            startTime: l.startTime,
+            endTime: l.endTime,
+          })
+        ) {
+          lockedSeatMap.set(l.seatId, l);
+        }
+      });
 
       let totalSeats = 0;
       let availableCount = 0;

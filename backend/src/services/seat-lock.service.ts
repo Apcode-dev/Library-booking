@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import prisma from '../config/prisma';
 import { ENV } from '../config/env';
-import { createDateTime, calculateDurationHours } from '../utils/time.utils';
+import { createDateTime, calculateDurationHours, doBookingsCollide } from '../utils/time.utils';
 
 export class SeatLockService {
   /**
@@ -100,34 +100,68 @@ export class SeatLockService {
         }
       }
 
-      // 2. Overlap Check: Existing Confirmed / Checked-in Bookings
-      // Overlap math: booking.startDateTime < endDateTime && booking.endDateTime > startDateTime
-      const conflictingBooking = await tx.booking.findFirst({
+      // 2. Overlap Check: Existing Confirmed / Checked-in Bookings on this seat
+      const candidateBookings = await tx.booking.findMany({
         where: {
           seatId,
           status: { in: ['CONFIRMED', 'CHECKED_IN'] },
-          startDateTime: { lt: endDateTime },
-          endDateTime: { gt: startDateTime },
+        },
+        select: {
+          id: true,
+          bookingType: true,
+          date: true,
+          startTime: true,
+          endTime: true,
+          validUntil: true,
+          startDateTime: true,
+          endDateTime: true,
+          bookingCode: true,
         },
       });
 
-      if (conflictingBooking) {
+      const targetLockQuery = {
+        bookingType,
+        date,
+        startTime,
+        endTime,
+        validUntil: bookingType === 'MONTHLY' ? endDateTime : null,
+      };
+
+      const hasBookingCollision = candidateBookings.some((existing) =>
+        doBookingsCollide(targetLockQuery, existing)
+      );
+
+      if (hasBookingCollision) {
         throw new Error(
-          `Double-booking prevented: Seat ${seat.seatNumber} is already confirmed for this time window.`
+          `Double-booking prevented: Desk ${seat.seatNumber} is already confirmed for this time slot.`
         );
       }
 
       // 3. Overlap Check: Active Temporary Seat Locks from other users (expiresAt > NOW())
-      const conflictingLock = await tx.seatLock.findFirst({
+      const candidateLocks = await tx.seatLock.findMany({
         where: {
           seatId,
           status: 'ACTIVE',
           expiresAt: { gt: now },
           userId: { not: userId }, // allow current user to refresh/re-lock their own selection
-          startDateTime: { lt: endDateTime },
-          endDateTime: { gt: startDateTime },
+        },
+        select: {
+          id: true,
+          date: true,
+          startTime: true,
+          endTime: true,
+          expiresAt: true,
         },
       });
+
+      const conflictingLock = candidateLocks.find((l) =>
+        doBookingsCollide(targetLockQuery, {
+          bookingType: 'HOURLY',
+          date: l.date,
+          startTime: l.startTime,
+          endTime: l.endTime,
+        })
+      );
 
       if (conflictingLock) {
         const remainingSeconds = Math.ceil(
@@ -173,22 +207,26 @@ export class SeatLockService {
 
       // Calculate cost breakdown
       let seatAmount = 0;
-      let durationHours = calculateDurationHours(startTime, endTime);
+      const dailyHours = calculateDurationHours(startTime, endTime);
       const hourlyRate = seat.hourlyPrice || seat.library.hourlyRate;
-      let durationLabel = `${durationHours} hours`;
+      let durationHours = dailyHours;
+      let durationLabel = `${dailyHours} hours`;
 
       if (bookingType === 'MONTHLY') {
-        durationHours = 30 * 12;
-        seatAmount = seat.library.monthlyRate || Math.round(hourlyRate * 80);
-        durationLabel = '30 Days (Monthly Pass)';
+        durationHours = 30 * dailyHours;
+        const fullMonthRate = seat.library.monthlyRate || Math.round(hourlyRate * 80);
+        // Base standard is 12h/day. Pro-rate by selected daily hours (1h, 2h, 4h, 6h, 12h, etc.)
+        seatAmount = Math.max(150, Math.round((fullMonthRate / 12) * dailyHours));
+        durationLabel = `30 Days Monthly Pass (${dailyHours}h/day: ${startTime} - ${endTime})`;
       } else if (bookingType === 'YEARLY') {
-        durationHours = 365 * 12;
-        seatAmount =
+        durationHours = 365 * dailyHours;
+        const fullYearRate =
           seat.library.yearlyRate ||
           (seat.library.monthlyRate ? seat.library.monthlyRate * 10 : Math.round(hourlyRate * 750));
-        durationLabel = '365 Days (Yearly VIP Pass)';
+        seatAmount = Math.max(1500, Math.round((fullYearRate / 12) * dailyHours));
+        durationLabel = `365 Days Yearly VIP Pass (${dailyHours}h/day: ${startTime} - ${endTime})`;
       } else {
-        seatAmount = parseFloat((durationHours * hourlyRate).toFixed(2));
+        seatAmount = parseFloat((dailyHours * hourlyRate).toFixed(2));
       }
 
       // Owner-controlled extra charges & taxes (0 by default unless set by owner)

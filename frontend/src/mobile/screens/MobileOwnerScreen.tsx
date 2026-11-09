@@ -1230,20 +1230,54 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
                             </div>
                           </div>
 
-                          <div className="text-right">
-                            <span className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-amber-400 font-mono font-bold text-[10px]">
-                              {log.seatNumber || 'Desk'}
-                            </span>
-                            <span className="text-[10px] text-emerald-400 flex items-center gap-1 justify-end font-semibold mt-1">
-                              <Clock className="w-3 h-3 text-emerald-400" />
-                              <span>
-                                {new Date(log.checkInTime).toLocaleTimeString('en-US', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  hour12: true,
-                                })}
+                          <div className="text-right space-y-1">
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <span className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-amber-400 font-mono font-bold text-[10px]">
+                                {log.seatNumber || 'Desk'}
                               </span>
-                            </span>
+                              {log.checkOutType === 'MANUAL' && (
+                                <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold">
+                                  Manual Exit
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="text-[10px] space-y-0.5">
+                              <div className="text-emerald-400 flex items-center gap-1 justify-end font-semibold">
+                                <span>In:</span>
+                                <span className="font-mono">
+                                  {new Date(log.checkInTime).toLocaleTimeString('en-US', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hour12: true,
+                                  })}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 justify-end font-semibold">
+                                {log.checkOutTime ? (
+                                  <span className="text-amber-400 flex items-center gap-1">
+                                    <span>Out:</span>
+                                    <span className="font-mono">
+                                      {new Date(log.checkOutTime).toLocaleTimeString('en-US', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hour12: true,
+                                      })}
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-400 text-[9px] flex items-center gap-1 font-bold">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    Still Inside
+                                  </span>
+                                )}
+                              </div>
+                              {log.durationMinutes !== null && log.durationMinutes !== undefined && log.durationMinutes > 0 && (
+                                <div className="text-slate-400 text-[9px] text-right">
+                                  {Math.floor(log.durationMinutes / 60)}h {log.durationMinutes % 60}m
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))}

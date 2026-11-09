@@ -16,6 +16,8 @@ import {
   HelpCircle,
   Armchair,
   Trash2,
+  LogOut,
+  X,
 } from 'lucide-react';
 
 interface SwipeableItemProps {
@@ -126,6 +128,60 @@ export const MobilePassesScreen: React.FC<MobilePassesScreenProps> = ({
   const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBookingForPass, setSelectedBookingForPass] = useState<any | null>(null);
+
+  // Check-Out State (Realtime 1-tap & Manual fallback)
+  const [checkingOutId, setCheckingOutId] = useState<string | null>(null);
+  const [isManualCheckoutOpen, setIsManualCheckoutOpen] = useState(false);
+  const [selectedBookingForManualCheckout, setSelectedBookingForManualCheckout] = useState<any | null>(null);
+  const [manualDate, setManualDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [manualTime, setManualTime] = useState(() => {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  });
+  const [manualNotes, setManualNotes] = useState('');
+
+  const formatTime = (dateStr?: string | Date | null) => {
+    if (!dateStr) return '--:--';
+    try {
+      return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '--:--';
+    }
+  };
+
+  const formatDuration = (mins?: number | null) => {
+    if (mins === undefined || mins === null) return null;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h}h`;
+    return `${m}m`;
+  };
+
+  const handleCheckOut = async (bookingId: string, isManual = false) => {
+    setCheckingOutId(bookingId);
+    try {
+      const payload: any = { isManual };
+      if (isManual) {
+        payload.manualDate = manualDate;
+        payload.manualTime = manualTime;
+        payload.notes = manualNotes;
+      }
+      const res = await api.post(`/bookings/${bookingId}/checkout`, payload);
+      if (res.data?.success) {
+        toast.success(res.data.message || 'Checked out successfully! 👋');
+        setIsManualCheckoutOpen(false);
+        setManualNotes('');
+        fetchBookingsAndAttendance();
+      } else {
+        toast.error(res.data?.message || 'Check-out failed');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Error processing check-out.');
+    } finally {
+      setCheckingOutId(null);
+    }
+  };
 
   const fetchBookingsAndAttendance = async () => {
     if (!user) {
@@ -336,6 +392,72 @@ export const MobilePassesScreen: React.FC<MobilePassesScreenProps> = ({
                   </div>
                 )}
 
+                {/* Realtime Check-Out / Hall Presence Controls */}
+                {(b.isCurrentlyInside || b.status === 'CHECKED_IN') ? (
+                  <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                        </span>
+                        <span className="text-xs font-black text-emerald-300">
+                          Currently in Study Hall
+                        </span>
+                      </div>
+                      {b.checkInTime && (
+                        <span className="text-[10px] text-emerald-400/80 font-mono">
+                          In: {formatTime(b.checkInTime)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleCheckOut(b.id, false)}
+                        disabled={checkingOutId === b.id}
+                        className="py-2.5 px-3 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white rounded-xl text-xs font-black shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>{checkingOutId === b.id ? 'Leaving...' : 'Check Out Now'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedBookingForManualCheckout(b);
+                          setManualDate(b.date || new Date().toLocaleDateString('en-CA'));
+                          setIsManualCheckoutOpen(true);
+                        }}
+                        className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-bold transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Manual Time</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between px-1 text-[11px] text-slate-400">
+                    <span className="flex items-center gap-1 text-slate-500">
+                      <Clock className="w-3 h-3" />
+                      <span>Shift: {b.startTime} - {b.endTime}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedBookingForManualCheckout(b);
+                        setManualDate(b.date || new Date().toLocaleDateString('en-CA'));
+                        setIsManualCheckoutOpen(true);
+                      }}
+                      className="text-slate-400 hover:text-amber-400 flex items-center gap-1 transition text-[10px]"
+                    >
+                      <Clock className="w-3 h-3 text-amber-400" />
+                      <span>Manual Check-Out</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Show QR Ticket Action */}
                 <button
                   type="button"
@@ -381,36 +503,77 @@ export const MobilePassesScreen: React.FC<MobilePassesScreenProps> = ({
           ) : (
             attendanceLogs.map((att) => (
               <SwipeableItem key={att.id} id={att.id} onDelete={handleDeleteAttendance}>
-                <div className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
-                  <div>
-                    <div className="font-bold text-white">{att.library?.name || 'Library'}</div>
-                    <div className="text-[10px] text-slate-400">
-                      Desk {att.seatNumber || 'Standard'} • {att.passType} Pass
+                <div className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-bold text-white text-sm">{att.library?.name || 'Library'}</div>
+                      <div className="text-[10px] text-slate-400">
+                        Desk {att.seatNumber || att.booking?.seat?.seatNumber || 'Assigned'} • {att.passType || att.booking?.bookingType || 'Pass'}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {att.checkOutType === 'MANUAL' && (
+                        <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold">
+                          Manual Exit
+                        </span>
+                      )}
+                      {att.checkOutTime && att.checkOutType !== 'MANUAL' && (
+                        <span className="px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-bold">
+                          Realtime
+                        </span>
+                      )}
+                      {!att.checkOutTime && (
+                        <span className="px-2 py-0.5 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 text-[9px] font-bold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                          In Hall
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteAttendance(att.id);
+                        }}
+                        className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                        title="Delete record"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2.5">
-                    <div className="text-right">
-                      <div className="text-emerald-400 font-bold">{att.date}</div>
-                      <div className="text-[10px] text-slate-500">
-                        {new Date(att.checkInTime).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </div>
+                  <div className="p-2.5 bg-slate-950 rounded-xl border border-slate-800/80 grid grid-cols-3 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-[9px] text-slate-500 block uppercase font-bold">Date</span>
+                      <span className="text-white font-mono font-semibold">{att.date}</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteAttendance(att.id);
-                      }}
-                      className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
-                      title="Delete record"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div>
+                      <span className="text-[9px] text-slate-500 block uppercase font-bold">Check-In</span>
+                      <span className="text-emerald-400 font-mono font-bold">{formatTime(att.checkInTime)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-slate-500 block uppercase font-bold">Check-Out</span>
+                      <span className={`font-mono font-bold ${att.checkOutTime ? 'text-amber-400' : 'text-slate-500'}`}>
+                        {att.checkOutTime ? formatTime(att.checkOutTime) : 'Pending'}
+                      </span>
+                    </div>
                   </div>
+
+                  {(att.durationMinutes !== null && att.durationMinutes !== undefined && att.durationMinutes > 0) && (
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                      <span className="flex items-center gap-1 text-slate-300">
+                        <Clock className="w-3 h-3 text-blue-400" />
+                        <span>Total Time Inside: <strong className="text-white">{formatDuration(att.durationMinutes)}</strong></span>
+                      </span>
+                    </div>
+                  )}
+
+                  {att.manualExitNotes && (
+                    <div className="text-[10px] text-slate-400 italic bg-slate-950/70 px-2.5 py-1.5 rounded-xl border border-slate-800/60">
+                      📝 {att.manualExitNotes}
+                    </div>
+                  )}
                 </div>
               </SwipeableItem>
             ))
@@ -490,6 +653,101 @@ export const MobilePassesScreen: React.FC<MobilePassesScreenProps> = ({
           onClose={() => setSelectedBookingForPass(null)}
           onBookingUpdated={fetchBookingsAndAttendance}
         />
+      )}
+
+      {/* Manual Check-Out Modal */}
+      {isManualCheckoutOpen && selectedBookingForManualCheckout && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">Manual Check-Out</h3>
+                  <p className="text-[10px] text-slate-400">
+                    {selectedBookingForManualCheckout.library?.name} • Desk {selectedBookingForManualCheckout.seat?.seatNumber}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsManualCheckoutOpen(false);
+                  setSelectedBookingForManualCheckout(null);
+                }}
+                className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Forgot to check out earlier when leaving? Enter your exit date and time below to accurately update your study session and digital attendance register.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                  Exit Date
+                </label>
+                <input
+                  type="date"
+                  value={manualDate}
+                  onChange={(e) => setManualDate(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                  Exit Time
+                </label>
+                <input
+                  type="time"
+                  value={manualTime}
+                  onChange={(e) => setManualTime(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                  Reason / Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Left early for lunch / Forgot to tap checkout"
+                  value={manualNotes}
+                  onChange={(e) => setManualNotes(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsManualCheckoutOpen(false);
+                  setSelectedBookingForManualCheckout(null);
+                }}
+                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCheckOut(selectedBookingForManualCheckout.id, true)}
+                disabled={checkingOutId === selectedBookingForManualCheckout.id}
+                className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black rounded-xl text-xs shadow-lg transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {checkingOutId === selectedBookingForManualCheckout.id ? 'Recording...' : 'Save Check-Out'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
