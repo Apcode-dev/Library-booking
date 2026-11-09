@@ -202,9 +202,9 @@ export class ManagerController {
         let computedStatus = 'AVAILABLE';
         if (!seat.isAvailable) {
           computedStatus = 'MAINTENANCE';
-        } else if (activeBooking?.status === 'CHECKED_IN' || activeBooking?.status === 'ACTIVE') {
+        } else if (activeBooking?.status === 'CHECKED_IN') {
           computedStatus = 'CHECKED_IN';
-        } else if (activeBooking?.status === 'CONFIRMED') {
+        } else if (activeBooking?.status === 'CONFIRMED' || activeBooking?.status === 'ACTIVE') {
           computedStatus = 'BOOKED';
         } else if (activeLock) {
           computedStatus = 'LOCKED';
@@ -412,6 +412,19 @@ export class ManagerController {
             0
           );
 
+          const safeBookings = dayBookings.map((b) => ({
+            id: b.id,
+            bookingCode: b.bookingCode,
+            date: b.date,
+            startTime: b.startTime,
+            endTime: b.endTime,
+            bookingType: b.bookingType,
+            status: b.status,
+            totalAmount: b.totalAmount || b.payment?.amount || 0,
+            user: { name: b.user?.name || 'Student', phone: b.user?.phone || '' },
+            seat: { seatNumber: b.seat?.seatNumber || 'Desk' },
+          }));
+
           await prisma.archivedDailyBooking.upsert({
             where: {
               libraryId_date: {
@@ -422,14 +435,14 @@ export class ManagerController {
             update: {
               totalBookings: dayBookings.length,
               totalRevenue: dayRevenue,
-              bookingsData: JSON.stringify(dayBookings),
+              bookingsData: JSON.stringify(safeBookings),
             },
             create: {
               libraryId,
               date: dateStr,
               totalBookings: dayBookings.length,
               totalRevenue: dayRevenue,
-              bookingsData: JSON.stringify(dayBookings),
+              bookingsData: JSON.stringify(safeBookings),
             },
           });
         }

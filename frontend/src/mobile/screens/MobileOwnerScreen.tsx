@@ -89,6 +89,10 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
 
   // Attendance Day-by-Day Accordion State (stores expanded dates)
   const [expandedDates, setExpandedDates] = useState<string[]>([]);
+  // Bookings Day-by-Day Accordion State
+  const [expandedBookingDates, setExpandedBookingDates] = useState<string[]>([]);
+  // Unique Student Accordion in Branch view
+  const [expandedStudentKey, setExpandedStudentKey] = useState<string | null>(null);
 
   // Search & Filter for Bookings Tab
   const [bookingSearch, setBookingSearch] = useState('');
@@ -198,6 +202,72 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
       return matchesSearch && matchesBranch && matchesType;
     });
   }, [studentsData, bookingSearch, bookingFilterBranch, bookingFilterType]);
+
+  // Group Bookings by Date (Day-by-Day Folders)
+  const groupedBookings = useMemo(() => {
+    const groups: { [dateStr: string]: any[] } = {};
+
+    allBookings.forEach((b) => {
+      const dateKey = b.date || (b.createdAt ? new Date(b.createdAt).toLocaleDateString('en-CA') : 'Other');
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(b);
+    });
+
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
+    return Object.entries(groups)
+      .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+      .map(([date, items]) => {
+        const isToday = date === todayStr;
+        const totalRev = items.reduce((sum, item) => sum + (item.payment?.amount || item.totalAmount || 0), 0);
+        let formattedDate = date;
+        try {
+          const parsed = new Date(date);
+          if (!isNaN(parsed.getTime())) {
+            formattedDate = parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+          }
+        } catch (_) {}
+        return {
+          date,
+          formattedDate,
+          count: items.length,
+          totalRev,
+          items,
+          isToday,
+        };
+      });
+  }, [allBookings]);
+
+  useEffect(() => {
+    if (groupedBookings.length > 0 && expandedBookingDates.length === 0) {
+      setExpandedBookingDates([groupedBookings[0].date]);
+    }
+  }, [groupedBookings]);
+
+  // Group Branch Bookings by Unique Student (Deduplicated Student Directory with Dropdown Passes)
+  const branchStudents = useMemo(() => {
+    if (!selectedBranch) return [];
+    const branchBookings = (studentsData.dailyBookings || []).concat(studentsData.premiumPasses || []).filter(
+      (b: any) => b.libraryId === selectedBranch.id
+    );
+
+    const studentMap = new Map<string, { key: string; student: any; passes: any[] }>();
+    branchBookings.forEach((b: any) => {
+      const sKey = b.user?.id || b.user?.phone || b.user?.email || 'anon';
+      if (!studentMap.has(sKey)) {
+        studentMap.set(sKey, {
+          key: sKey,
+          student: b.user || { name: 'Student', phone: 'No contact' },
+          passes: [],
+        });
+      }
+      studentMap.get(sKey)!.passes.push(b);
+    });
+
+    return Array.from(studentMap.values());
+  }, [selectedBranch, studentsData]);
 
   // Dedicated Branch Metrics for the Unlocked / Selected Branch
   const branchMetrics = useMemo(() => {
@@ -547,9 +617,16 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
           </select>
         </div>
 
-        {/* Bookings List */}
+        {/* Bookings List (Date-Wise Dropdown / Accordion Folders) */}
         <div className="space-y-2.5 pt-1">
-          {allBookings.length === 0 ? (
+          <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+            <span>Date-by-Date Folders</span>
+            <span className="font-mono text-emerald-400 font-bold">
+              {groupedBookings.length} Recorded Days ({allBookings.length} Total)
+            </span>
+          </div>
+
+          {groupedBookings.length === 0 ? (
             <div className="p-8 text-center bg-slate-900 rounded-3xl border border-slate-800 space-y-2">
               <Calendar className="w-8 h-8 text-slate-600 mx-auto" />
               <p className="text-white font-bold">No bookings found</p>
@@ -558,116 +635,156 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
               </p>
             </div>
           ) : (
-            allBookings.map((b) => (
-              <div
-                key={b.id}
-                className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2.5 shadow-md"
-              >
-                {/* Top Row: Branch & Pass Type */}
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono font-bold text-[10px]">
-                      {b.library?.lid || 'LID'}
-                    </span>
-                    <span className="font-extrabold text-white text-xs truncate max-w-[150px]">
-                      {b.library?.name}
-                    </span>
-                  </div>
+            groupedBookings.map((group) => {
+              const isExpanded = expandedBookingDates.includes(group.date);
 
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                      b.bookingType === 'YEARLY'
-                        ? 'bg-purple-950 text-purple-300 border border-purple-800'
-                        : b.bookingType === 'MONTHLY'
-                        ? 'bg-amber-950 text-amber-300 border border-amber-800'
-                        : 'bg-blue-950 text-blue-300 border border-blue-800'
-                    }`}
+              return (
+                <div
+                  key={group.date}
+                  className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-md transition"
+                >
+                  {/* Date Folder Header Dropdown Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExpandedBookingDates((prev) =>
+                        prev.includes(group.date)
+                          ? prev.filter((d) => d !== group.date)
+                          : [...prev, group.date]
+                      );
+                    }}
+                    className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-800/50 transition cursor-pointer"
                   >
-                    {b.bookingType}
-                  </span>
-                </div>
-
-                {/* Student Info & Desk */}
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h4 className="font-bold text-white text-xs">{b.user?.name || 'Student'}</h4>
-                    <p className="text-[10px] text-slate-400">{b.user?.phone || b.user?.email}</p>
-                    <span className="font-mono text-[10px] text-indigo-400 font-bold block mt-0.5">
-                      Code: {b.bookingCode}
-                    </span>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="px-2 py-1 rounded-xl bg-slate-950 border border-slate-800 text-amber-400 font-mono font-black text-xs block">
-                      {b.seat?.seatNumber || 'Desk #'}
-                    </span>
-                    <span className="text-[10px] font-extrabold text-emerald-400 block mt-1">
-                      ₹{b.totalAmount || b.payment?.amount || 0}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Razorpay Transaction ID Verification */}
-                {b.payment?.transactionId && (
-                  <div className="flex items-center justify-between bg-slate-950/90 px-2.5 py-1.5 rounded-xl border border-slate-800/80 text-[10px]">
-                    <div className="flex items-center gap-1.5 text-emerald-400 font-mono font-semibold">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0" />
-                      <span className="truncate max-w-[190px]">TXN: {b.payment.transactionId}</span>
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className={`p-2 rounded-xl border ${
+                          group.isToday
+                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                            : 'bg-slate-800 text-slate-300 border-slate-700'
+                        }`}
+                      >
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-white text-xs">{group.formattedDate}</span>
+                          {group.isToday && (
+                            <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-black text-[9px] uppercase tracking-wider">
+                              Today
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          {group.count} booking{group.count === 1 ? '' : 's'} • Collection: ₹{group.totalRev}
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-[9px] font-black uppercase text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded">
-                      Razorpay
-                    </span>
-                  </div>
-                )}
 
-                {/* 1-Hour Extension Status: Pending vs Completed */}
-                {(b.extensionPaymentStatus === 'PENDING' || (Number(b.pendingExtensionHours) > 0 && b.extensionPaymentStatus !== 'PAID')) && (
-                  <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/30 px-2.5 py-1.5 rounded-xl text-[10px]">
-                    <div className="flex items-center gap-1.5 text-amber-300 font-bold">
-                      <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                      <span>+{b.pendingExtensionHours || 1}h Ext. (Payment Pending)</span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-1 rounded-xl bg-slate-950 text-white font-mono font-bold text-[10px] border border-slate-800">
+                        {group.count} Booked
+                      </span>
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                      )}
                     </div>
-                    <span className="font-extrabold text-amber-400">
-                      ₹{b.pendingExtensionAmount || 20} Due
-                    </span>
-                  </div>
-                )}
+                  </button>
 
-                {b.extensionPaymentStatus === 'PAID' && (
-                  <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl text-[10px]">
-                    <div className="flex items-center gap-1.5 text-emerald-300 font-bold">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                      <span>+{b.pendingExtensionHours || 1}h Ext. (Payment Completed)</span>
+                  {/* Expanded Bookings for this Date */}
+                  {isExpanded && (
+                    <div className="p-3 pt-0 space-y-2.5 border-t border-slate-800/80 mt-1">
+                      {group.items.map((b) => (
+                        <div
+                          key={b.id}
+                          className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2 shadow-sm"
+                        >
+                          {/* Top Row: Branch & Pass Type */}
+                          <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono font-bold text-[10px]">
+                                {b.library?.lid || 'LID'}
+                              </span>
+                              <span className="font-extrabold text-white text-xs truncate max-w-[150px]">
+                                {b.library?.name}
+                              </span>
+                            </div>
+
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                b.bookingType === 'YEARLY'
+                                  ? 'bg-purple-950 text-purple-300 border border-purple-800'
+                                  : b.bookingType === 'MONTHLY'
+                                  ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                                  : 'bg-blue-950 text-blue-300 border border-blue-800'
+                              }`}
+                            >
+                              {b.bookingType}
+                            </span>
+                          </div>
+
+                          {/* Student Info & Desk */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="font-bold text-white text-xs">{b.user?.name || 'Student'}</h4>
+                              <p className="text-[10px] text-slate-400">{b.user?.phone || b.user?.email}</p>
+                              <span className="font-mono text-[10px] text-indigo-400 font-bold block mt-0.5">
+                                Code: {b.bookingCode}
+                              </span>
+                            </div>
+
+                            <div className="text-right">
+                              <span className="px-2 py-1 rounded-xl bg-slate-900 border border-slate-800 text-amber-400 font-mono font-black text-xs block">
+                                {b.seat?.seatNumber || 'Desk #'}
+                              </span>
+                              <span className="text-[10px] font-extrabold text-emerald-400 block mt-1">
+                                ₹{b.totalAmount || b.payment?.amount || 0}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Razorpay Transaction ID Verification */}
+                          {b.payment?.transactionId && (
+                            <div className="flex items-center justify-between bg-slate-900 px-2 py-1 rounded-lg border border-slate-800 text-[10px]">
+                              <div className="flex items-center gap-1 text-emerald-400 font-mono font-semibold">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                                <span className="truncate max-w-[180px]">TXN: {b.payment.transactionId}</span>
+                              </div>
+                              <span className="text-[9px] font-black uppercase text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1 py-0.5 rounded">
+                                Paid
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Timing & Status */}
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] text-slate-400">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-500" />
+                              <span>
+                                {b.startTime || ''} - {b.endTime || ''}
+                              </span>
+                            </span>
+
+                            <span
+                              className={`font-bold ${
+                                b.status === 'CHECKED_IN'
+                                  ? 'text-emerald-400'
+                                  : b.status === 'CONFIRMED'
+                                  ? 'text-blue-400'
+                                  : 'text-slate-400'
+                              }`}
+                            >
+                              {b.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <span className="font-mono text-emerald-400 text-[9px] font-bold">
-                      {b.extensionPaymentId ? `TXN: ${b.extensionPaymentId.slice(-8)}` : 'PAID'}
-                    </span>
-                  </div>
-                )}
-
-                {/* Timing & Status */}
-                <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-slate-500" />
-                    <span>
-                      {b.date || 'Active'} • {b.startTime || ''} - {b.endTime || ''}
-                    </span>
-                  </span>
-
-                  <span
-                    className={`font-bold ${
-                      b.status === 'CHECKED_IN'
-                        ? 'text-emerald-400'
-                        : b.status === 'CONFIRMED'
-                        ? 'text-blue-400'
-                        : 'text-slate-400'
-                    }`}
-                  >
-                    {b.status}
-                  </span>
+                  )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -903,43 +1020,126 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
             </div>
           )}
 
-          {/* Sub-view 3: Student Directory */}
+          {/* Sub-view 3: Student Directory (Deduplicated with Dropdown Access Passes) */}
           {branchSubView === 'students' && (
             <div className="space-y-2.5">
-              <span className="font-bold text-white text-xs block">
-                Student Directory & Access Records • {selectedBranch.lid || 'LID'}
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white text-xs block">
+                  Student Directory & Access Records • {selectedBranch.lid || 'LID'}
+                </span>
+                <span className="text-[10px] text-indigo-400 font-mono font-bold">
+                  {branchStudents.length} Unique Student{branchStudents.length === 1 ? '' : 's'}
+                </span>
+              </div>
 
-              {allBookings.filter((b) => b.libraryId === selectedBranch.id).length === 0 ? (
+              {branchStudents.length === 0 ? (
                 <div className="p-8 text-center bg-slate-900 rounded-3xl border border-slate-800 text-slate-400">
                   <Users className="w-8 h-8 mx-auto text-slate-600 mb-2" />
                   <p>No active students registered at this branch yet.</p>
                 </div>
               ) : (
-                allBookings
-                  .filter((b) => b.libraryId === selectedBranch.id)
-                  .map((b) => (
+                branchStudents.map(({ key, student, passes }) => {
+                  const isExpanded = expandedStudentKey === key;
+                  const activePass = passes.find(
+                    (p: any) => p.status === 'CHECKED_IN' || p.status === 'CONFIRMED' || p.status === 'ACTIVE'
+                  );
+
+                  return (
                     <div
-                      key={b.id}
-                      className="p-3 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between"
+                      key={key}
+                      className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-md transition"
                     >
-                      <div>
-                        <h4 className="font-bold text-white">{b.user?.name}</h4>
-                        <p className="text-[10px] text-slate-400">{b.user?.phone}</p>
-                        <span className="text-[10px] text-indigo-400 font-mono font-bold">
-                          {b.bookingCode}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-800 text-amber-400 font-mono font-bold text-xs">
-                          {b.seat?.seatNumber}
-                        </span>
-                        <span className="text-[9px] text-slate-500 block mt-0.5">
-                          {b.bookingType}
-                        </span>
-                      </div>
+                      {/* Main Student Header (Accordion Toggle) */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedStudentKey((prev) => (prev === key ? null : key))
+                        }
+                        className="w-full p-3 flex items-center justify-between text-left hover:bg-slate-800/50 transition cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0 shadow">
+                            {student?.name?.charAt(0)?.toUpperCase() || 'S'}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-white text-xs truncate">
+                              {student?.name || 'Student'}
+                            </h4>
+                            <p className="text-[10px] text-slate-400 truncate">
+                              {student?.phone || student?.email || 'No phone'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-mono font-bold text-[10px]">
+                            {passes.length} Pass{passes.length === 1 ? '' : 'es'}
+                          </span>
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-slate-400" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-slate-400" />
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Dropdown Section: All Passes and Sessions for this Student */}
+                      {isExpanded && (
+                        <div className="p-3 pt-0 border-t border-slate-800/80 space-y-2 mt-1 bg-slate-950/40">
+                          <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-500 block pt-1.5">
+                            Pass Records for {student?.name}
+                          </span>
+
+                          {passes.map((b: any) => (
+                            <div
+                              key={b.id}
+                              className="p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between text-xs"
+                            >
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-[10px] text-blue-400 font-bold">
+                                    {b.bookingCode}
+                                  </span>
+                                  <span
+                                    className={`px-1.5 py-0.2 rounded text-[8px] font-black uppercase ${
+                                      b.bookingType === 'YEARLY'
+                                        ? 'bg-purple-950 text-purple-300 border border-purple-800'
+                                        : b.bookingType === 'MONTHLY'
+                                        ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                                        : 'bg-blue-950 text-blue-300 border border-blue-800'
+                                    }`}
+                                  >
+                                    {b.bookingType}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-400 truncate">
+                                  {b.date} • {b.startTime} - {b.endTime}
+                                </p>
+                              </div>
+
+                              <div className="text-right shrink-0">
+                                <span className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-amber-400 font-mono font-bold text-xs block">
+                                  {b.seat?.seatNumber ? `Desk ${b.seat.seatNumber}` : 'Assigned'}
+                                </span>
+                                <span
+                                  className={`text-[9px] font-bold block mt-0.5 ${
+                                    b.status === 'CHECKED_IN'
+                                      ? 'text-emerald-400'
+                                      : b.status === 'CONFIRMED'
+                                      ? 'text-blue-400'
+                                      : 'text-slate-400'
+                                  }`}
+                                >
+                                  {b.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))
+                  );
+                })
               )}
             </div>
           )}

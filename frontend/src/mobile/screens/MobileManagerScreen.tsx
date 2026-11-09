@@ -160,6 +160,14 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
     }
   }, [user]);
 
+  // Reset open modals whenever switching tabs to prevent unwanted popups
+  useEffect(() => {
+    setIsOldBookingsModalOpen(false);
+    setIsPinModalOpen(false);
+    setIsOldRecordsModalOpen(false);
+    setSelectedStudent(null);
+  }, [activeTab]);
+
   // Handle PIN Unlock
   const handleVerifyPin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -453,8 +461,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
   // =========================================================================
   // TAB 1: MANAGER DASHBOARD (Assigned Branch with PIN Unlock & Desks)
   // =========================================================================
-  if (activeTab === 'manager_dashboard') {
-    return (
+  const renderDashboardTab = () => (
       <div className="space-y-4 pb-28 px-4 pt-3 text-xs">
         {/* Manager Header Banner */}
         <div className="p-4 rounded-3xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-teal-950/80 border border-emerald-500/30 flex items-center justify-between shadow-xl">
@@ -723,23 +730,31 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
 
                     <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                       {categoryGroup.seats.map((seat: any) => {
-                        const isCheckedIn = seat.status === 'CHECKED_IN';
-                        const isBooked = seat.status === 'BOOKED';
-                        const isLocked = seat.status === 'LOCKED';
+                        const seatBooking = (allBookingsList || bookings || []).find(
+                          (b: any) =>
+                            (b.seatId === seat.id || String(b.seat?.seatNumber || '').toUpperCase() === String(seat.seatNumber || '').toUpperCase()) &&
+                            (b.status === 'CONFIRMED' || b.status === 'ACTIVE' || b.status === 'CHECKED_IN')
+                        );
+
                         const isMaint = seat.status === 'MAINTENANCE' || seat.isAvailable === false;
+                        const isCheckedIn = !isMaint && (seat.status === 'CHECKED_IN' || seatBooking?.status === 'CHECKED_IN');
+                        const isBooked = !isMaint && !isCheckedIn && (seat.status === 'BOOKED' || Boolean(seatBooking));
+                        const isLocked = !isMaint && !isCheckedIn && !isBooked && seat.status === 'LOCKED';
 
                         let seatBg = 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300';
-                        let statusText = 'ACTIVE';
+                        let statusText = 'AVAILABLE';
 
                         if (isMaint) {
                           seatBg = 'bg-rose-950/40 border-rose-500/40 text-rose-300';
                           statusText = 'MAINT.';
                         } else if (isCheckedIn) {
                           seatBg = 'bg-purple-950/60 border-purple-500/60 text-purple-300 ring-1 ring-purple-500/40';
-                          statusText = seat.activeStudentName ? seat.activeStudentName.split(' ')[0] : 'IN';
+                          const name = seat.activeStudentName || seatBooking?.user?.name;
+                          statusText = name ? `${name.split(' ')[0]} (IN)` : 'IN';
                         } else if (isBooked) {
                           seatBg = 'bg-blue-950/60 border-blue-500/60 text-blue-300';
-                          statusText = seat.activeStudentName ? seat.activeStudentName.split(' ')[0] : 'BOOKED';
+                          const name = seat.activeStudentName || seatBooking?.user?.name;
+                          statusText = name ? name.split(' ')[0] : 'BOOKED';
                         } else if (isLocked) {
                           seatBg = 'bg-amber-950/60 border-amber-500/60 text-amber-300';
                           statusText = 'HOLD';
@@ -810,148 +825,146 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
             )}
           </div>
         )}
-
-        {/* PIN Verification Modal */}
-        {isPinModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in">
-            <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <KeyRound className="w-5 h-5 text-emerald-400" />
-                  <h3 className="text-sm font-extrabold text-white">Unlock Branch Console</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsPinModalOpen(false)}
-                  className="p-1 rounded-full text-slate-400 hover:text-white"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleVerifyPin} className="space-y-4">
-                <p className="text-[11px] text-slate-300 leading-tight">
-                  Enter your 6-digit Manager PIN assigned by the owner to access branch operations.
-                </p>
-
-                <input
-                  type="password"
-                  required
-                  maxLength={6}
-                  autoFocus
-                  placeholder="••••••"
-                  value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
-                  className="w-full py-3 bg-slate-950 border border-slate-800 rounded-2xl text-center text-xl font-mono text-white tracking-widest focus:outline-none focus:border-emerald-500"
-                />
-
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    disabled={verifyingPin || pinInput.length !== 6}
-                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-bold shadow-md shadow-emerald-950/40 active:scale-95 transition"
-                  >
-                    {verifyingPin ? 'Verifying...' : 'Unlock Console'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsPinModalOpen(false)}
-                    className="px-4 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Old Records (Monthly Historical Archive) Modal */}
-        {isOldRecordsModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in text-xs">
-            <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    <History className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black text-white">Old Records & Past Months</h3>
-                    <span className="text-[10px] text-slate-400">Archived Monthly Revenue • {library.name}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsOldRecordsModalOpen(false)}
-                  className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
-                💡 <strong>Auto-Archive:</strong> Current month ({dashboardMetrics?.currentMonthName || 'This Month'}) complete hote hi uska total revenue aur bookings data yahan automatically archive ho jata hai.
-              </div>
-
-              <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
-                {(!dashboardMetrics?.oldRecords || dashboardMetrics.oldRecords.length === 0) ? (
-                  <div className="p-8 text-center bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
-                    <Archive className="w-8 h-8 text-slate-600 mx-auto" />
-                    <p className="text-white font-bold text-xs">No Past Months Archived Yet</p>
-                    <p className="text-[10px] text-slate-400">
-                      Jab yeh maheena ({dashboardMetrics?.currentMonthName || 'Current Month'}) pura hoga, tab uska revenue yahan auto-archive ho jayega.
-                    </p>
-                  </div>
-                ) : (
-                  dashboardMetrics.oldRecords.map((rec: any) => (
-                    <div
-                      key={rec.monthKey}
-                      className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-center justify-between hover:border-emerald-500/40 transition"
-                    >
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="font-extrabold text-white text-xs">{rec.label}</span>
-                        </div>
-                        <span className="text-[10px] text-slate-400 block">
-                          {rec.bookingsCount} Completed Bookings
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-mono font-black text-sm text-emerald-400 block">
-                          ₹{rec.totalRevenue.toLocaleString('en-IN')}
-                        </span>
-                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-bold inline-block">
-                          Archived
-                        </span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="pt-2 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsOldRecordsModalOpen(false)}
-                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold cursor-pointer transition active:scale-95"
-                >
-                  Close Archive
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
-    );
-  }
+  );
+
+  // Global PIN Verification Modal
+  const renderPinModal = () => isPinModalOpen && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in">
+      <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <KeyRound className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-sm font-extrabold text-white">Unlock Branch Console</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsPinModalOpen(false)}
+            className="p-1 rounded-full text-slate-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleVerifyPin} className="space-y-4">
+          <p className="text-[11px] text-slate-300 leading-tight">
+            Enter your 6-digit Manager PIN assigned by the owner to access branch operations.
+          </p>
+
+          <input
+            type="password"
+            required
+            maxLength={6}
+            autoFocus
+            placeholder="••••••"
+            value={pinInput}
+            onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+            className="w-full py-3 bg-slate-950 border border-slate-800 rounded-2xl text-center text-xl font-mono text-white tracking-widest focus:outline-none focus:border-emerald-500"
+          />
+
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={verifyingPin || pinInput.length !== 6}
+              className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-bold shadow-md shadow-emerald-950/40 active:scale-95 transition"
+            >
+              {verifyingPin ? 'Verifying...' : 'Unlock Console'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPinModalOpen(false)}
+              className="px-4 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  // Global Old Records (Monthly Historical Archive) Modal
+  const renderOldRecordsModal = () => isOldRecordsModalOpen && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in text-xs">
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <History className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-white">Old Records & Past Months</h3>
+              <span className="text-[10px] text-slate-400">Archived Monthly Revenue • {library.name}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsOldRecordsModalOpen(false)}
+            className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
+          💡 <strong>Auto-Archive:</strong> Current month ({dashboardMetrics?.currentMonthName || 'This Month'}) complete hote hi uska total revenue aur bookings data yahan automatically archive ho jata hai.
+        </div>
+
+        <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
+          {(!dashboardMetrics?.oldRecords || dashboardMetrics.oldRecords.length === 0) ? (
+            <div className="p-8 text-center bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+              <Archive className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="text-white font-bold text-xs">No Past Months Archived Yet</p>
+              <p className="text-[10px] text-slate-400">
+                Jab yeh maheena ({dashboardMetrics?.currentMonthName || 'Current Month'}) pura hoga, tab uska revenue yahan auto-archive ho jayega.
+              </p>
+            </div>
+          ) : (
+            dashboardMetrics.oldRecords.map((rec: any) => (
+              <div
+                key={rec.monthKey}
+                className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-center justify-between hover:border-emerald-500/40 transition"
+              >
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="font-extrabold text-white text-xs">{rec.label}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 block">
+                    {rec.bookingsCount} Completed Bookings
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono font-black text-sm text-emerald-400 block">
+                    ₹{rec.totalRevenue.toLocaleString('en-IN')}
+                  </span>
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-bold inline-block">
+                    Archived
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="pt-2 border-t border-slate-800">
+          <button
+            type="button"
+            onClick={() => setIsOldRecordsModalOpen(false)}
+            className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold cursor-pointer transition active:scale-95"
+          >
+            Close Archive
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   // =========================================================================
   // TAB 2: MANAGER BOOKINGS (Strictly Daily / Today's Bookings)
   // =========================================================================
-  if (activeTab === 'manager_bookings') {
-    return (
-      <div className="space-y-3.5 pb-28 px-4 pt-3 text-xs">
+  const renderBookingsTab = () => (
+    <div className="space-y-3.5 pb-28 px-4 pt-3 text-xs">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -1068,14 +1081,12 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
         </div>
       </div>
     );
-  }
 
   // =========================================================================
   // TAB 3: MANAGER ATTENDANCE (Security Gate Scanner & Validate Pass)
   // =========================================================================
-  if (activeTab === 'manager_attendance') {
-    return (
-      <div className="space-y-4 pb-28 px-4 pt-3 text-xs">
+  const renderAttendanceTab = () => (
+    <div className="space-y-4 pb-28 px-4 pt-3 text-xs">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -1238,14 +1249,12 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
         />
       </div>
     );
-  }
 
   // =========================================================================
   // TAB 4: USERS (Students who have booked this library)
   // =========================================================================
-  if (activeTab === 'manager_users') {
-    return (
-      <div className="space-y-3.5 pb-28 px-4 pt-3 text-xs">
+  const renderUsersTab = () => (
+    <div className="space-y-3.5 pb-28 px-4 pt-3 text-xs">
         {/* Header */}
         <div>
           <div className="flex items-center gap-1.5 text-purple-400 font-bold uppercase tracking-wider text-[10px]">
@@ -1373,12 +1382,11 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
         )}
       </div>
     );
-  }
 
   // =========================================================================
   // TAB 5: MANAGER PROFILE
   // =========================================================================
-  return (
+  const renderProfileTab = () => (
     <div className="space-y-4 pb-28 px-4 pt-3 text-xs">
       {/* Profile Hero Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4 relative overflow-hidden">
@@ -1501,143 +1509,158 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
           <ChevronRight className="w-4 h-4 text-slate-600" />
         </button>
       </div>
+    </div>
+  );
 
-      {/* Old Bookings Day-by-Day Historical Archive Modal */}
-      {isOldBookingsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in text-xs">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  <History className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-white">Old Bookings History</h3>
-                  <span className="text-[10px] text-slate-400">Day-by-Day Past Records • {library.name}</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsOldBookingsModalOpen(false)}
-                className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
+  // Global Old Bookings Day-by-Day Historical Archive Modal
+  const renderOldBookingsModal = () => isOldBookingsModalOpen && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in text-xs">
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <History className="w-5 h-5" />
             </div>
-
-            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
-              💡 <strong>Auto-Archive:</strong> Har din complete hote hi us din ki saari bookings date ke sath database me automatically archive ho jati hain. Kisi bhi din par tap karke us din ki saari bookings dekhein.
-            </div>
-
-            <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
-              {loadingOldBookings ? (
-                <div className="p-8 text-center space-y-2">
-                  <Loader2 className="w-6 h-6 text-amber-400 animate-spin mx-auto" />
-                  <p className="text-slate-400 text-xs">Loading archived days from database...</p>
-                </div>
-              ) : oldBookingsDays.length === 0 ? (
-                <div className="p-8 text-center bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
-                  <Archive className="w-8 h-8 text-slate-600 mx-auto" />
-                  <p className="text-white font-bold text-xs">No Past Days Archived Yet</p>
-                  <p className="text-[10px] text-slate-400">
-                    Jaise hi aaj ka din over hoga, us din ki saari bookings date ke sath yahan auto-archive ho jayengi.
-                  </p>
-                </div>
-              ) : (
-                oldBookingsDays.map((day: any) => {
-                  const isExpanded = expandedDate === day.date;
-                  return (
-                    <div
-                      key={day.date}
-                      className="rounded-2xl bg-slate-950 border border-slate-800/80 overflow-hidden transition"
-                    >
-                      {/* Day summary row */}
-                      <button
-                        type="button"
-                        onClick={() => setExpandedDate(isExpanded ? null : day.date)}
-                        className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-900/60 transition cursor-pointer"
-                      >
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                            <span className="font-extrabold text-white text-xs">{day.formattedDate || day.date}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-400 block">
-                            {day.totalBookings} {day.totalBookings === 1 ? 'Booking' : 'Bookings'}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-black text-sm text-emerald-400">
-                            ₹{(day.totalRevenue || 0).toLocaleString('en-IN')}
-                          </span>
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-slate-400" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-slate-400" />
-                          )}
-                        </div>
-                      </button>
-
-                      {/* Expanded Day's Detailed Bookings */}
-                      {isExpanded && (
-                        <div className="p-3 border-t border-slate-900 bg-slate-900/40 space-y-2">
-                          {(!day.bookings || day.bookings.length === 0) ? (
-                            <p className="text-[10px] text-slate-500 italic">No bookings recorded for this day.</p>
-                          ) : (
-                            day.bookings.map((b: any) => (
-                              <div
-                                key={b.id}
-                                className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-bold text-white text-xs">{b.user?.name || 'Student'}</span>
-                                    <span className="font-mono text-[9px] text-slate-400">({b.bookingCode})</span>
-                                  </div>
-                                  <span className="px-2 py-0.5 rounded-full bg-blue-600/20 text-blue-300 font-bold text-[9px]">
-                                    Desk {b.seat?.seatNumber || 'N/A'}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                  <span>
-                                    {b.bookingType || 'Hourly'} Pass • {b.startTime && b.endTime ? `${b.startTime}-${b.endTime}` : b.date}
-                                  </span>
-                                  <span className="font-bold text-emerald-400">
-                                    ₹{b.totalAmount || 0} ({b.payment?.paymentStatus || 'PAID'})
-                                  </span>
-                                </div>
-
-                                {b.user?.phone && (
-                                  <div className="text-[9px] text-slate-500">
-                                    📞 {b.user.phone}
-                                  </div>
-                                )}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="pt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setIsOldBookingsModalOpen(false)}
-                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold cursor-pointer transition active:scale-95"
-              >
-                Close Old Bookings
-              </button>
+            <div>
+              <h3 className="text-sm font-black text-white">Old Bookings History</h3>
+              <span className="text-[10px] text-slate-400">Day-by-Day Past Records • {library.name}</span>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsOldBookingsModalOpen(false)}
+            className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      )}
+
+        <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
+          💡 <strong>Auto-Archive:</strong> Har din complete hote hi us din ki saari bookings date ke sath database me automatically archive ho jati hain. Kisi bhi din par tap karke us din ki saari bookings dekhein.
+        </div>
+
+        <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
+          {loadingOldBookings ? (
+            <div className="p-8 text-center space-y-2">
+              <Loader2 className="w-6 h-6 text-amber-400 animate-spin mx-auto" />
+              <p className="text-slate-400 text-xs">Loading archived days from database...</p>
+            </div>
+          ) : oldBookingsDays.length === 0 ? (
+            <div className="p-8 text-center bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+              <Archive className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="text-white font-bold text-xs">No Past Days Archived Yet</p>
+              <p className="text-[10px] text-slate-400">
+                Jaise hi aaj ka din over hoga, us din ki saari bookings date ke sath yahan auto-archive ho jayengi.
+              </p>
+            </div>
+          ) : (
+            oldBookingsDays.map((day: any) => {
+              const isExpanded = expandedDate === day.date;
+              return (
+                <div
+                  key={day.date}
+                  className="rounded-2xl bg-slate-950 border border-slate-800/80 overflow-hidden transition"
+                >
+                  {/* Day summary row */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedDate(isExpanded ? null : day.date)}
+                    className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-900/60 transition cursor-pointer"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="font-extrabold text-white text-xs">{day.formattedDate || day.date}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 block">
+                        {day.totalBookings} {day.totalBookings === 1 ? 'Booking' : 'Bookings'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-black text-sm text-emerald-400">
+                        ₹{(day.totalRevenue || 0).toLocaleString('en-IN')}
+                      </span>
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Expanded Day's Detailed Bookings */}
+                  {isExpanded && (
+                    <div className="p-3 border-t border-slate-900 bg-slate-900/40 space-y-2">
+                      {(!day.bookings || day.bookings.length === 0) ? (
+                        <p className="text-[10px] text-slate-500 italic">No bookings recorded for this day.</p>
+                      ) : (
+                        day.bookings.map((b: any) => (
+                          <div
+                            key={b.id}
+                            className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-white text-xs">{b.user?.name || 'Student'}</span>
+                                <span className="font-mono text-[9px] text-slate-400">({b.bookingCode})</span>
+                              </div>
+                              <span className="px-2 py-0.5 rounded-full bg-blue-600/20 text-blue-300 font-bold text-[9px]">
+                                Desk {b.seat?.seatNumber || 'N/A'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[10px] text-slate-400">
+                              <span>
+                                {b.bookingType || 'Hourly'} Pass • {b.startTime && b.endTime ? `${b.startTime}-${b.endTime}` : b.date}
+                              </span>
+                              <span className="font-bold text-emerald-400">
+                                ₹{b.totalAmount || 0} ({b.payment?.paymentStatus || 'PAID'})
+                              </span>
+                            </div>
+
+                            {b.user?.phone && (
+                              <div className="text-[9px] text-slate-500">
+                                📞 {b.user.phone}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="pt-2 border-t border-slate-800">
+          <button
+            type="button"
+            onClick={() => setIsOldBookingsModalOpen(false)}
+            className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold cursor-pointer transition active:scale-95"
+          >
+            Close Old Bookings
+          </button>
+        </div>
+      </div>
     </div>
+  );
+
+  return (
+    <>
+      {activeTab === 'manager_dashboard' && renderDashboardTab()}
+      {activeTab === 'manager_bookings' && renderBookingsTab()}
+      {activeTab === 'manager_attendance' && renderAttendanceTab()}
+      {activeTab === 'manager_users' && renderUsersTab()}
+      {activeTab === 'manager_profile' && renderProfileTab()}
+
+      {/* Global Shared Modals */}
+      {renderPinModal()}
+      {renderOldRecordsModal()}
+      {renderOldBookingsModal()}
+    </>
   );
 };
 

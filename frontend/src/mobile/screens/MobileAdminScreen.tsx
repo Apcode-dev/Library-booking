@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -29,6 +29,8 @@ import {
   HelpCircle,
   LogOut,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   FileText,
   Mail,
   Phone,
@@ -89,6 +91,23 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
   // 5. View Student Details Modal (State Admin Users tab)
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
 
+  // 6. Regional Directory State (City -> Owner -> Libraries)
+  const [expandedCities, setExpandedCities] = useState<Record<string, boolean>>({});
+  const [expandedOwners, setExpandedOwners] = useState<Record<string, boolean>>({});
+  const [viewingLibraryDetails, setViewingLibraryDetails] = useState<any | null>(null);
+  const [viewPhotoIdx, setViewPhotoIdx] = useState(0);
+  const [librarySearchQuery, setLibrarySearchQuery] = useState('');
+
+  // Reset modal states when switching tabs to prevent unwanted popups
+  useEffect(() => {
+    setInspectingLib(null);
+    setActionDialogMode(null);
+    setViewingLibraryDetails(null);
+    setSelectedSubAdmin(null);
+    setSelectedUser(null);
+    setIsAddAdminOpen(false);
+  }, [activeTab]);
+
   const isSubAdmin = user?.adminType === 'SUB_ADMIN';
   const isMasterAdmin = !isSubAdmin;
   const assignedState = user?.assignedState;
@@ -131,28 +150,119 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
   }, [user]);
 
   // Approvals Filter (Strict One-Time Approval & Removal on Forward)
-  const approvalApplications = libraries.filter((lib) => {
-    // Already approved or rejected libraries must never appear in approvals
-    if (lib.status === 'APPROVED' || lib.status === 'REJECTED') return false;
+  const approvalApplications = useMemo(() => {
+    return libraries.filter((lib) => {
+      const statusUpper = (lib.status || '').toUpperCase();
+      // Already approved or rejected libraries must never appear in approvals
+      if (statusUpper === 'APPROVED' || statusUpper === 'REJECTED') return false;
 
-    if (isSubAdmin) {
-      // State Admin only sees pending applications that have NOT been forwarded to Master Admin
-      return (
-        lib.state === assignedState &&
-        lib.status === 'PENDING' &&
-        !lib.forwardedToMaster
-      );
-    }
+      if (isSubAdmin) {
+        // State Admin only sees pending applications that have NOT been forwarded to Master Admin
+        return (
+          lib.state === assignedState &&
+          statusUpper === 'PENDING' &&
+          !lib.forwardedToMaster
+        );
+      }
 
-    // Master Admin sees pending applications AND applications escalated/forwarded by State Admins
-    return lib.status === 'PENDING' || lib.status === 'FORWARDED_TO_MASTER' || lib.forwardedToMaster === true;
-  });
+      // Master Admin sees pending applications AND applications escalated/forwarded by State Admins
+      return statusUpper === 'PENDING' || statusUpper === 'FORWARDED_TO_MASTER' || lib.forwardedToMaster === true;
+    });
+  }, [libraries, isSubAdmin, assignedState]);
 
   // State Libraries (for State Admin Library tab)
-  const stateLibraries = libraries.filter((lib) => {
-    if (isSubAdmin) return lib.state === assignedState;
-    return true;
-  });
+  const stateLibraries = useMemo(() => {
+    return libraries.filter((lib) => {
+      if (isSubAdmin) return lib.state === assignedState;
+      return true;
+    });
+  }, [libraries, isSubAdmin, assignedState]);
+
+  // Group stateLibraries: City -> Owner -> City-specific Libraries (2-Tier Dropdowns)
+  const groupedCityLibraries = useMemo(() => {
+    const query = librarySearchQuery.trim().toLowerCase();
+    const cityMap: Record<
+      string,
+      {
+        cityName: string;
+        ownerMap: Record<
+          string,
+          {
+            ownerId: string;
+            ownerName: string;
+            ownerEmail?: string;
+            ownerPhone?: string;
+            libraries: any[];
+          }
+        >;
+      }
+    > = {};
+
+    stateLibraries.forEach((lib) => {
+      if (query) {
+        const matchName = (lib.name || '').toLowerCase().includes(query);
+        const matchLid = (lib.lid || '').toLowerCase().includes(query);
+        const matchCity = (lib.city || '').toLowerCase().includes(query);
+        const matchOwner = (lib.owner?.name || '').toLowerCase().includes(query);
+        if (!matchName && !matchLid && !matchCity && !matchOwner) return;
+      }
+
+      const rawCity = (lib.city || 'Other').trim();
+      const cityFormatted = rawCity.charAt(0).toUpperCase() + rawCity.slice(1);
+      const ownerId = lib.owner?.id || lib.ownerId || 'unknown_owner';
+      const ownerName = lib.owner?.name || 'Library Owner';
+      const ownerEmail = lib.owner?.email || '';
+      const ownerPhone = lib.owner?.phone || '';
+
+      if (!cityMap[cityFormatted]) {
+        cityMap[cityFormatted] = {
+          cityName: cityFormatted,
+          ownerMap: {},
+        };
+      }
+
+      if (!cityMap[cityFormatted].ownerMap[ownerId]) {
+        cityMap[cityFormatted].ownerMap[ownerId] = {
+          ownerId,
+          ownerName,
+          ownerEmail,
+          ownerPhone,
+          libraries: [],
+        };
+      }
+
+      cityMap[cityFormatted].ownerMap[ownerId].libraries.push(lib);
+    });
+
+    const result = Object.values(cityMap).map((c) => {
+      const owners = Object.values(c.ownerMap).sort((a, b) =>
+        a.ownerName.localeCompare(b.ownerName)
+      );
+      const totalLibs = owners.reduce((acc, o) => acc + o.libraries.length, 0);
+      return {
+        cityName: c.cityName,
+        displayTitle: `${c.cityName} Libraries`,
+        librariesCount: totalLibs,
+        owners,
+      };
+    });
+
+    return result.sort((a, b) => a.cityName.localeCompare(b.cityName));
+  }, [stateLibraries, librarySearchQuery]);
+
+  // Auto-expand first city by default
+  useEffect(() => {
+    if (groupedCityLibraries.length > 0 && Object.keys(expandedCities).length === 0) {
+      const firstCity = groupedCityLibraries[0].cityName;
+      const initialCityState: Record<string, boolean> = { [firstCity]: true };
+      const initialOwnerState: Record<string, boolean> = {};
+      if (groupedCityLibraries[0].owners.length > 0) {
+        initialOwnerState[`${firstCity}__${groupedCityLibraries[0].owners[0].ownerId}`] = true;
+      }
+      setExpandedCities(initialCityState);
+      setExpandedOwners(initialOwnerState);
+    }
+  }, [groupedCityLibraries]);
 
   // State Users (for State Admin Users tab)
   const stateUsers = usersList.filter((u) => {
@@ -663,9 +773,9 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
   }
 
   // =========================================================================
-  // TAB 2B: STATE ADMIN -> LIBRARY TAB (STATE LIBRARIES LIST & DETAILS)
+  // TAB 2B: STATE ADMIN -> LIBRARY TAB (CITY-WISE & OWNER-WISE HIERARCHY)
   // =========================================================================
-  if (activeTab === 'admin_libraries' && isSubAdmin) {
+  if (activeTab === 'admin_libraries') {
     return (
       <div className="space-y-4 pb-28 px-4 pt-3 text-xs">
         {/* Header */}
@@ -675,62 +785,346 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
             <span>Regional Directory</span>
           </div>
           <h2 className="text-xl font-black text-white tracking-tight">
-            {assignedState} Libraries ({stateLibraries.length})
+            {assignedState || 'State'} Libraries ({stateLibraries.length})
           </h2>
+          <span className="text-[10px] text-slate-400">
+            Organized city-wise and owner-wise across {groupedCityLibraries.length} {groupedCityLibraries.length === 1 ? 'city' : 'cities'}
+          </span>
         </div>
 
-        {/* Libraries Cards */}
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+          <input
+            type="text"
+            value={librarySearchQuery}
+            onChange={(e) => setLibrarySearchQuery(e.target.value)}
+            placeholder="Search by library name, city, owner, LID..."
+            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        {/* 2-Tier Hierarchy: City Dropdown -> Owner Dropdown -> City-specific Libraries */}
         <div className="space-y-3">
-          {stateLibraries.map((lib) => (
-            <div
-              key={lib.id}
-              onClick={() => {
-                setInspectingLib(lib);
-                setInspectPhotoIdx(0);
-              }}
-              className="p-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-lg space-y-2.5 cursor-pointer active:scale-98 transition"
-            >
-              <div className="flex items-center justify-between">
-                <span className="px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono font-bold text-[10px]">
-                  {lib.lid || 'LID'}
-                </span>
-                <span
-                  className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                    lib.status === 'APPROVED'
-                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                      : 'bg-amber-950 text-amber-300 border border-amber-800'
-                  }`}
+          {groupedCityLibraries.length === 0 ? (
+            <div className="p-8 text-center bg-slate-900 rounded-3xl border border-slate-800 space-y-2">
+              <Building2 className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="text-white font-bold">No Libraries Found</p>
+              <p className="text-[11px] text-slate-400">
+                {librarySearchQuery
+                  ? 'No libraries match your search filter.'
+                  : `No partner libraries registered in ${assignedState || 'this state'} yet.`}
+              </p>
+            </div>
+          ) : (
+            groupedCityLibraries.map((cityGroup) => {
+              const isCityExpanded = !!expandedCities[cityGroup.cityName];
+              return (
+                <div
+                  key={cityGroup.cityName}
+                  className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg transition"
                 >
-                  {lib.status}
-                </span>
-              </div>
+                  {/* LEVEL 1: City Dropdown Header (e.g. "Varanasi Libraries") */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedCities((prev) => ({
+                        ...prev,
+                        [cityGroup.cityName]: !prev[cityGroup.cityName],
+                      }))
+                    }
+                    className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-800/40 transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                        <MapPin className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-white text-sm">
+                          {cityGroup.displayTitle}
+                        </h3>
+                        <span className="text-[10px] text-slate-400">
+                          {cityGroup.librariesCount} {cityGroup.librariesCount === 1 ? 'Library' : 'Libraries'} • {cityGroup.owners.length} {cityGroup.owners.length === 1 ? 'Owner' : 'Owners'}
+                        </span>
+                      </div>
+                    </div>
 
-              <div>
-                <h4 className="font-bold text-white text-sm">{lib.name}</h4>
-                <p className="text-[10px] text-slate-400 line-clamp-1">
-                  📍 {lib.address}, {lib.city}
-                </p>
-              </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-950 border border-slate-800 text-blue-300 font-bold">
+                        {cityGroup.cityName}
+                      </span>
+                      {isCityExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                      )}
+                    </div>
+                  </button>
 
-              <div className="grid grid-cols-3 gap-2 text-center text-[10px] pt-1 border-t border-slate-800">
-                <div className="p-1 bg-slate-950 rounded-lg">
-                  <span className="text-slate-500 block">Total Desks</span>
-                  <span className="font-bold text-white">{lib.totalSeats}</span>
+                  {/* LEVEL 2: Inside City -> Owner Dropdowns */}
+                  {isCityExpanded && (
+                    <div className="p-3 border-t border-slate-800/80 bg-slate-950/60 space-y-2.5">
+                      {cityGroup.owners.map((ownerGroup) => {
+                        const ownerKey = `${cityGroup.cityName}__${ownerGroup.ownerId}`;
+                        const isOwnerExpanded = !!expandedOwners[ownerKey];
+                        return (
+                          <div
+                            key={ownerKey}
+                            className="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden shadow-sm"
+                          >
+                            {/* Owner Dropdown Header */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedOwners((prev) => ({
+                                  ...prev,
+                                  [ownerKey]: !prev[ownerKey],
+                                }))
+                              }
+                              className="w-full p-3 flex items-center justify-between text-left hover:bg-slate-800/50 transition cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-black text-xs">
+                                  {ownerGroup.ownerName.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[9px] font-extrabold uppercase text-amber-400">Owner</span>
+                                    <span className="font-bold text-white text-xs">{ownerGroup.ownerName}</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-400">
+                                    {ownerGroup.ownerPhone || ownerGroup.ownerEmail || 'No contact'} • {ownerGroup.libraries.length} in {cityGroup.cityName}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                <span className="px-2 py-0.5 rounded-md bg-slate-800 text-[9px] font-bold text-slate-300">
+                                  {ownerGroup.libraries.length} {ownerGroup.libraries.length === 1 ? 'Space' : 'Spaces'}
+                                </span>
+                                {isOwnerExpanded ? (
+                                  <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                                )}
+                              </div>
+                            </button>
+
+                            {/* LEVEL 3: Inside Owner -> Only Libraries in THIS specific city */}
+                            {isOwnerExpanded && (
+                              <div className="p-2.5 border-t border-slate-800/80 bg-slate-950 space-y-2">
+                                {ownerGroup.libraries.map((lib) => (
+                                  <div
+                                    key={lib.id}
+                                    onClick={() => {
+                                      setViewingLibraryDetails(lib);
+                                      setViewPhotoIdx(0);
+                                    }}
+                                    className="p-3 bg-slate-900 border border-slate-800 hover:border-blue-500/50 rounded-xl space-y-2 cursor-pointer active:scale-[0.98] transition shadow-md"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono font-bold text-[10px]">
+                                        {lib.lid || 'LID'}
+                                      </span>
+                                      <span
+                                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                          lib.status === 'APPROVED'
+                                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                            : 'bg-amber-950 text-amber-300 border border-amber-800'
+                                        }`}
+                                      >
+                                        {lib.status}
+                                      </span>
+                                    </div>
+
+                                    <div>
+                                      <h4 className="font-bold text-white text-xs">{lib.name}</h4>
+                                      <p className="text-[10px] text-slate-400 line-clamp-1">
+                                        📍 {lib.address}, {lib.city}
+                                      </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] pt-1 border-t border-slate-800/80">
+                                      <div className="p-1 bg-slate-950 rounded-lg">
+                                        <span className="text-slate-500 block text-[9px]">Desks</span>
+                                        <span className="font-bold text-white">{lib.totalSeats}</span>
+                                      </div>
+                                      <div className="p-1 bg-slate-950 rounded-lg">
+                                        <span className="text-slate-500 block text-[9px]">Rate</span>
+                                        <span className="font-bold text-blue-400">₹{lib.hourlyRate}/h</span>
+                                      </div>
+                                      <div className="p-1 bg-slate-950 rounded-lg">
+                                        <span className="text-slate-500 block text-[9px]">Timings</span>
+                                        <span className="font-bold text-slate-300 truncate block text-[9px]">
+                                          {lib.openingTime || '8 AM'} - {lib.closingTime || '8 PM'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <div className="p-1 bg-slate-950 rounded-lg">
-                  <span className="text-slate-500 block">Rate</span>
-                  <span className="font-bold text-blue-400">₹{lib.hourlyRate}/h</span>
-                </div>
-                <div className="p-1 bg-slate-950 rounded-lg">
-                  <span className="text-slate-500 block">Owner</span>
-                  <span className="font-bold text-slate-300 truncate block">
-                    {lib.owner?.name?.split(' ')[0] || 'Owner'}
+              );
+            })
+          )}
+        </div>
+
+        {/* Read-Only Branch Details Modal */}
+        {viewingLibraryDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full my-auto overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+              {/* Modal Top Header */}
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/70">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 font-mono font-bold text-xs">
+                    {viewingLibraryDetails.lid || 'LID'}
                   </span>
+                  <h3 className="font-black text-white text-sm truncate max-w-[200px]">
+                    {viewingLibraryDetails.name}
+                  </h3>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setViewingLibraryDetails(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Scrollable Modal Content */}
+              <div className="p-4 space-y-4 overflow-y-auto flex-1 text-xs">
+                {/* 3-Photo Showcase Carousel */}
+                <div className="relative h-44 rounded-2xl overflow-hidden bg-slate-950 border border-slate-800">
+                  {(() => {
+                    const photos = [
+                      viewingLibraryDetails.bannerImage || viewingLibraryDetails.photos?.[0],
+                      viewingLibraryDetails.interiorImage || viewingLibraryDetails.photos?.[1],
+                      viewingLibraryDetails.amenitiesImage || viewingLibraryDetails.photos?.[2],
+                    ].filter(Boolean);
+
+                    const currentPhoto =
+                      photos[viewPhotoIdx] ||
+                      'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=800';
+
+                    return (
+                      <>
+                        <img
+                          src={currentPhoto}
+                          alt="Library Showcase"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center bg-slate-950/80 px-2 py-1 rounded-xl backdrop-blur-md">
+                          <span className="text-[10px] text-slate-300 font-bold">
+                            Photo {viewPhotoIdx + 1} of {photos.length || 1}
+                          </span>
+                          <div className="flex gap-1.5">
+                            {photos.map((_, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => setViewPhotoIdx(i)}
+                                className={`w-2 h-2 rounded-full transition-all ${
+                                  viewPhotoIdx === i ? 'w-4 bg-blue-400' : 'bg-white/40'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Location & Address */}
+                <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Physical Location
+                  </span>
+                  <p className="text-white font-semibold text-xs leading-relaxed">
+                    {viewingLibraryDetails.address}, {viewingLibraryDetails.city}, {viewingLibraryDetails.state}
+                  </p>
+                  {viewingLibraryDetails.pincode && (
+                    <span className="text-[11px] text-blue-400 font-mono font-bold block">
+                      PIN Code: {viewingLibraryDetails.pincode}
+                    </span>
+                  )}
+                </div>
+
+                {/* Owner Information */}
+                <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                    Registered Owner Details
+                  </span>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="text-slate-400">Name:</span>
+                    <span className="font-bold text-white">{viewingLibraryDetails.owner?.name || 'Owner'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="text-slate-400">Email:</span>
+                    <span className="font-semibold text-white">{viewingLibraryDetails.owner?.email || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="text-slate-400">Phone:</span>
+                    <span className="font-semibold text-white">{viewingLibraryDetails.owner?.phone || 'Not added'}</span>
+                  </div>
+                </div>
+
+                {/* Desk Allocation & Pricing */}
+                <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                  <div className="p-2 bg-slate-950 rounded-xl border border-slate-800">
+                    <span className="text-slate-500 block">Total Desks</span>
+                    <span className="font-bold text-white text-xs">{viewingLibraryDetails.totalSeats}</span>
+                  </div>
+                  <div className="p-2 bg-slate-950 rounded-xl border border-slate-800">
+                    <span className="text-slate-500 block">Hourly Rate</span>
+                    <span className="font-bold text-blue-400 text-xs">₹{viewingLibraryDetails.hourlyRate}/h</span>
+                  </div>
+                  <div className="p-2 bg-slate-950 rounded-xl border border-slate-800">
+                    <span className="text-slate-500 block">Monthly Pass</span>
+                    <span className="font-bold text-amber-400 text-xs">₹{viewingLibraryDetails.monthlyRate || 1200}</span>
+                  </div>
+                </div>
+
+                {/* Facilities List */}
+                {Array.isArray(viewingLibraryDetails.facilities) && viewingLibraryDetails.facilities.length > 0 && (
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1.5">
+                      Provided Amenities
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {viewingLibraryDetails.facilities.map((fac: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-800 text-[10px] text-slate-300 font-semibold"
+                        >
+                          ✓ {fac}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons Footer (Read-Only) */}
+              <div className="p-4 border-t border-slate-800 bg-slate-950">
+                <button
+                  type="button"
+                  onClick={() => setViewingLibraryDetails(null)}
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs transition active:scale-95 cursor-pointer"
+                >
+                  Close Details
+                </button>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
     );
   }
