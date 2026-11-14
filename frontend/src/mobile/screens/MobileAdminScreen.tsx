@@ -192,6 +192,7 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
             ownerName: string;
             ownerEmail?: string;
             ownerPhone?: string;
+            ownerAvatar?: string;
             libraries: any[];
           }
         >;
@@ -213,6 +214,7 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
       const ownerName = lib.owner?.name || 'Library Owner';
       const ownerEmail = lib.owner?.email || '';
       const ownerPhone = lib.owner?.phone || '';
+      const ownerAvatar = lib.owner?.avatar || '';
 
       if (!cityMap[cityFormatted]) {
         cityMap[cityFormatted] = {
@@ -227,6 +229,7 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
           ownerName,
           ownerEmail,
           ownerPhone,
+          ownerAvatar,
           libraries: [],
         };
       }
@@ -883,10 +886,18 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
                               }
                               className="w-full p-3 flex items-center justify-between text-left hover:bg-slate-800/50 transition cursor-pointer"
                             >
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-black text-xs">
-                                  {ownerGroup.ownerName.charAt(0).toUpperCase()}
-                                </div>
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {ownerGroup.ownerAvatar ? (
+                                  <img
+                                    src={ownerGroup.ownerAvatar}
+                                    alt={ownerGroup.ownerName}
+                                    className="w-8 h-8 rounded-lg object-cover border border-amber-500/30 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-black text-xs shrink-0">
+                                    {ownerGroup.ownerName.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
                                 <div>
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-[9px] font-extrabold uppercase text-amber-400">Owner</span>
@@ -1058,21 +1069,36 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
                 </div>
 
                 {/* Owner Information */}
-                <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1.5">
+                <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">
                     Registered Owner Details
                   </span>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400">Name:</span>
-                    <span className="font-bold text-white">{viewingLibraryDetails.owner?.name || 'Owner'}</span>
+                  <div className="flex items-center gap-3">
+                    {viewingLibraryDetails.owner?.avatar ? (
+                      <img
+                        src={viewingLibraryDetails.owner.avatar}
+                        alt=""
+                        className="w-10 h-10 rounded-xl object-cover border border-amber-500/30 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-black text-sm shrink-0">
+                        {viewingLibraryDetails.owner?.name?.charAt(0).toUpperCase() || 'O'}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <span className="font-bold text-white text-xs block truncate">
+                        {viewingLibraryDetails.owner?.name || 'Owner'}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block truncate">
+                        {viewingLibraryDetails.owner?.email || 'N/A'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400">Email:</span>
-                    <span className="font-semibold text-white">{viewingLibraryDetails.owner?.email || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400">Phone:</span>
-                    <span className="font-semibold text-white">{viewingLibraryDetails.owner?.phone || 'Not added'}</span>
+                  <div className="flex items-center justify-between text-slate-300 text-xs pt-1 border-t border-slate-900">
+                    <span className="text-slate-400 text-[11px]">Phone:</span>
+                    <span className="font-semibold text-white font-mono text-[11px]">
+                      {viewingLibraryDetails.owner?.phone || 'Not added'}
+                    </span>
                   </div>
                 </div>
 
@@ -1283,21 +1309,36 @@ export const MobileAdminScreen: React.FC<MobileAdminScreenProps> = ({
                 </div>
 
                 {/* Owner Information */}
-                <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1.5">
+                <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">
                     Registered Owner Details
                   </span>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400">Name:</span>
-                    <span className="font-bold text-white">{inspectingLib.owner?.name}</span>
+                  <div className="flex items-center gap-3">
+                    {inspectingLib.owner?.avatar ? (
+                      <img
+                        src={inspectingLib.owner.avatar}
+                        alt=""
+                        className="w-10 h-10 rounded-xl object-cover border border-amber-500/30 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-black text-sm shrink-0">
+                        {inspectingLib.owner?.name?.charAt(0).toUpperCase() || 'O'}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <span className="font-bold text-white text-xs block truncate">
+                        {inspectingLib.owner?.name || 'Owner'}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block truncate">
+                        {inspectingLib.owner?.email || 'N/A'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400">Email:</span>
-                    <span className="font-semibold text-white">{inspectingLib.owner?.email}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400">Phone:</span>
-                    <span className="font-semibold text-white">{inspectingLib.owner?.phone || 'Not added'}</span>
+                  <div className="flex items-center justify-between text-slate-300 text-xs pt-1 border-t border-slate-900">
+                    <span className="text-slate-400 text-[11px]">Phone:</span>
+                    <span className="font-semibold text-white font-mono text-[11px]">
+                      {inspectingLib.owner?.phone || 'Not added'}
+                    </span>
                   </div>
                 </div>
 

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../config/prisma';
 import { EmailService } from '../services/email.service';
+import { autoReconcileExpiredAttendance } from '../utils/attendance.reconcile';
 
 export class OwnerController {
   /**
@@ -835,6 +836,9 @@ export class OwnerController {
         select: { id: true, name: true },
       });
       const libraryIds = libraries.map((l) => l.id);
+
+      // Auto-reconcile any attendances whose scheduled session or shift has expired
+      await autoReconcileExpiredAttendance(libraryIds);
 
       // Fetch all bookings for these libraries
       const bookings = await prisma.booking.findMany({

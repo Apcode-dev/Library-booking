@@ -1183,6 +1183,11 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
                           Manual Exit
                         </span>
                       )}
+                      {log.checkOutType === 'AUTO_EXPIRED' && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[9px] font-bold">
+                          Auto Exit
+                        </span>
+                      )}
                       {!log.checkOutTime ? (
                         <span className="px-2 py-0.5 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 text-[9px] font-bold flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -1190,7 +1195,7 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded-lg bg-slate-950 text-slate-300 border border-slate-800 text-[9px] font-bold">
-                          Exited
+                          {log.checkOutType === 'AUTO_EXPIRED' ? 'Auto Exited' : 'Exited'}
                         </span>
                       )}
                     </div>
@@ -1297,9 +1302,17 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
                 className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between gap-3 shadow-md hover:border-purple-500/40 transition cursor-pointer active:scale-98"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white font-black text-sm flex items-center justify-center shrink-0">
-                    {stu.name ? stu.name[0].toUpperCase() : 'S'}
-                  </div>
+                  {stu.avatar ? (
+                    <img
+                      src={stu.avatar}
+                      alt={stu.name}
+                      className="w-10 h-10 rounded-xl object-cover shrink-0 border border-purple-500/30 shadow-sm"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white font-black text-sm flex items-center justify-center shrink-0">
+                      {stu.name ? stu.name[0].toUpperCase() : 'S'}
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <h4 className="font-extrabold text-white text-xs truncate">{stu.name}</h4>
                     <span className="text-[10px] font-mono text-purple-400 block truncate">
@@ -1336,9 +1349,17 @@ export const MobileManagerScreen: React.FC<MobileManagerScreenProps> = ({
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white font-black text-base flex items-center justify-center shadow-md">
-                  {selectedStudent.name ? selectedStudent.name[0].toUpperCase() : 'S'}
-                </div>
+                {selectedStudent.avatar ? (
+                  <img
+                    src={selectedStudent.avatar}
+                    alt={selectedStudent.name}
+                    className="w-12 h-12 rounded-2xl object-cover shadow-md border border-purple-500/40 shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white font-black text-base flex items-center justify-center shadow-md shrink-0">
+                    {selectedStudent.name ? selectedStudent.name[0].toUpperCase() : 'S'}
+                  </div>
+                )}
                 <div>
                   <h3 className="text-sm font-extrabold text-white">{selectedStudent.name}</h3>
                   <span className="font-mono text-xs text-purple-400 font-bold block">

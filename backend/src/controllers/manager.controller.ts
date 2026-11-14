@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../config/prisma';
+import { autoReconcileExpiredAttendance } from '../utils/attendance.reconcile';
 
 export class ManagerController {
   /**
@@ -95,6 +96,9 @@ export class ManagerController {
       const currentMonth = parseInt(currentMonthStr, 10) - 1; // 0-indexed
       const currentMonthKey = `${currentYearStr}-${currentMonthStr}`;
 
+      // Auto-reconcile expired attendances for this library
+      await autoReconcileExpiredAttendance(library.id);
+
       const todayCheckIns = await prisma.attendance.count({
         where: {
           libraryId: library.id,
@@ -107,7 +111,7 @@ export class ManagerController {
           libraryId: library.id,
         },
         include: {
-          user: { select: { id: true, name: true, phone: true } },
+          user: { select: { id: true, name: true, phone: true, avatar: true } },
           booking: { select: { bookingCode: true, bookingType: true, seat: { select: { seatNumber: true } } } },
         },
         orderBy: { checkInTime: 'desc' },

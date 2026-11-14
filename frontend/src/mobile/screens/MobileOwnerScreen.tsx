@@ -1440,6 +1440,11 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
                                   Manual Exit
                                 </span>
                               )}
+                              {log.checkOutType === 'AUTO_EXPIRED' && (
+                                <span className="px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[9px] font-bold">
+                                  Auto Exit
+                                </span>
+                              )}
                             </div>
 
                             <div className="text-[10px] space-y-0.5">
@@ -1456,7 +1461,7 @@ export const MobileOwnerScreen: React.FC<MobileOwnerScreenProps> = ({
                               <div className="flex items-center gap-1 justify-end font-semibold">
                                 {log.checkOutTime ? (
                                   <span className="text-amber-400 flex items-center gap-1">
-                                    <span>Out:</span>
+                                    <span>{log.checkOutType === 'AUTO_EXPIRED' ? 'Auto-Out:' : 'Out:'}</span>
                                     <span className="font-mono">
                                       {new Date(log.checkOutTime).toLocaleTimeString('en-US', {
                                         hour: '2-digit',

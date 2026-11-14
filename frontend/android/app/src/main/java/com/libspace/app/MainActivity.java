@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Message;
 import android.view.ViewGroup;
+import android.webkit.GeolocationPermissions;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -16,25 +17,39 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends BridgeActivity {
-    private static final int CAMERA_REQUEST_CODE = 200;
+    private static final int PERMISSIONS_REQUEST_CODE = 200;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Proactively request camera permissions on launch for seamless QR scanning & photo upload
+        // Proactively request camera and location permissions on launch for seamless QR scanning & GPS distance
+        List<String> permissionsNeeded = new ArrayList<>();
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.CAMERA);
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+        }
+        if (!permissionsNeeded.isEmpty()) {
             ActivityCompat.requestPermissions(
                 this,
-                new String[]{Manifest.permission.CAMERA},
-                CAMERA_REQUEST_CODE
+                permissionsNeeded.toArray(new String[0]),
+                PERMISSIONS_REQUEST_CODE
             );
         }
 
-        // Enable popup windows and multi-window for Razorpay NetBanking and bank auth flows
+        // Enable popup windows, geolocation, and multi-window for Razorpay NetBanking and bank auth flows
         if (getBridge() != null && getBridge().getWebView() != null) {
             WebView mainWebView = getBridge().getWebView();
             WebSettings webSettings = mainWebView.getSettings();
@@ -42,8 +57,15 @@ public class MainActivity extends BridgeActivity {
             webSettings.setSupportMultipleWindows(true);
             webSettings.setDomStorageEnabled(true);
             webSettings.setDatabaseEnabled(true);
+            webSettings.setGeolocationEnabled(true);
+            webSettings.setGeolocationDatabasePath(getFilesDir().getPath());
 
             mainWebView.setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
+                @Override
+                public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                    callback.invoke(origin, true, false);
+                }
+
                 @Override
                 public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
                     WebView popupWebView = new WebView(MainActivity.this);
@@ -53,6 +75,7 @@ public class MainActivity extends BridgeActivity {
                     popupSettings.setDomStorageEnabled(true);
                     popupSettings.setDatabaseEnabled(true);
                     popupSettings.setSupportMultipleWindows(true);
+                    popupSettings.setGeolocationEnabled(true);
 
                     Dialog popupDialog = new Dialog(MainActivity.this, android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen);
                     popupDialog.setContentView(popupWebView, new ViewGroup.LayoutParams(
@@ -61,6 +84,11 @@ public class MainActivity extends BridgeActivity {
                     ));
 
                     popupWebView.setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
+                        @Override
+                        public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                            callback.invoke(origin, true, false);
+                        }
+
                         @Override
                         public void onCloseWindow(WebView window) {
                             if (popupDialog.isShowing()) {

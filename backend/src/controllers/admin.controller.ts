@@ -295,7 +295,7 @@ export class AdminController {
       const libraries = await prisma.library.findMany({
         where: whereClause,
         include: {
-          owner: { select: { name: true, email: true, phone: true } },
+          owner: { select: { id: true, name: true, email: true, phone: true, avatar: true } },
           _count: { select: { seats: true, bookings: true } },
           bookings: {
             where: { payment: { paymentStatus: 'PAID' } },
@@ -1032,6 +1032,7 @@ export class AdminController {
           name: true,
           email: true,
           phone: true,
+          avatar: true,
           role: true,
           isApproved: true,
           approvalStatus: true,
